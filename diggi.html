@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diggi Forms Sender</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: #F3F5F7;
+            color: #1E293B;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 540px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .field-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .field-group {
+            margin-bottom: 12px;
+        }
+        .field-group:last-child {
+            margin-bottom: 0;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"] {
+            width: 100%;
+            height: 46px;
+            padding: 0 12px;
+            font-size: 15px;
+            color: #1E293B;
+            background-color: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        input:focus {
+            border-color: #16A34A;
+        }
+        input::placeholder {
+            color: #94A3B8;
+        }
+        button {
+            width: 100%;
+            height: 52px;
+            background-color: #16A34A;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, opacity 0.15s ease;
+        }
+        button:hover:not(:disabled) {
+            background-color: #15803D;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .status-card {
+            background-color: #1E293B;
+            color: #E2E8F0;
+            border-radius: 14px;
+            padding: 14px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. Titel: Ort -->
+        <div class="card">
+            <label for="etAnswer1" class="card-title">Ort</label>
+            <input type="text" id="etAnswer1" list="maerkteList" value="Aldingen, Milkau" placeholder="Markt auswählen oder eingeben" autocomplete="off">
+            <datalist id="maerkteList"></datalist>
+        </div>
+
+        <!-- 2. Titel: E-Mail -->
+        <div class="card">
+            <label for="etAnswer2" class="card-title">E-Mail</label>
+            <input type="email" id="etAnswer2" value="" placeholder="Basis-E-Mail (optional, Standard: wekeytug@fuwamofu.com)" autocomplete="off">
+        </div>
+
+        <!-- Zeitstempel & Durchläufe -->
+        <div class="card">
+            <div class="field-group">
+                <label for="etStartDate" class="field-label">startDate</label>
+                <input type="text" id="etStartDate" value="2026-11-24T11:22:28.136Z">
+            </div>
+            <div class="field-group">
+                <label for="etSubmitDate" class="field-label">submitDate</label>
+                <input type="text" id="etSubmitDate" value="2026-11-24T14:58:03.704Z">
+            </div>
+            <div class="field-group">
+                <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+1, +2, ...)</label>
+                <input type="number" id="etRepeatCount" value="5" min="1">
+            </div>
+        </div>
+
+        <!-- Senden-Button -->
+        <button id="btnSend" type="button">Absenden</button>
+
+        <!-- Status-Log -->
+        <div id="tvStatus" class="status-card">Bereit.</div>
+    </div>
+
+    <script>
+        const endpointUrl = "https://forms.guest.usercontent.microsoft/formapi/api/857a7b86-2d66-46f2-92e1-25be0c27e398/users/66017ba1-3bde-4bdd-8828-75d8a82803bf/forms('hnt6hWYt8kaS4SW-DCfjmKF7AWbeO91LiCh12KgoA79UMDdSRkJOWEhYU0NaSzVJVVRWVjYzUVBPVy4u')/responses";
+
+        const maerkte = [
+            "Aldingen, Milkau",
+            "Altdorf, Hacker",
+            "Altensteig, Rentschler",
+            "Amorbach, Werner",
+            "Aschaffenburg, Stenger",
+            "Balingen, E-center",
+            "Besigheim, E-center",
+            "Birkenau, Bylitza",
+            "Birkenfeld, Berger",
+            "Bitburg, E-center",
+            "Blumberg, Milkau",
+            "Bondorf, Rentschler",
+            "Brücken, CAP Rockenhausen",
+            "Dietenheim, Daus",
+            "Durmersheim, Huck",
+            "Ehingen, Peterka",
+            "Eislingen, Gebauer",
+            "Elchesheim-Illingen, Huck",
+            "Emmingen-Liptingen, Milkau",
+            "Eppingen, Sommer",
+            "Esslingen a.Neckar, Sigel",
+            "Eutingen im Gäu, Rentschler",
+            "Filderstadt, Capurso",
+            "Friedrichshafen, Marktkauf",
+            "Gäufelden-Nebringen, Rentschler",
+            "Geisingen, Milkau",
+            "Gelnhausen-Meerholz, Lauber",
+            "Grafenau-Döffingen, Hacker",
+            "Großbottwar, Brenner",
+            "Großostheim, Stenger",
+            "Groß-Zimmern, Haller",
+            "Heidesheim am Rhein, Leist & Steiner",
+            "Heilbronn-Sontheim, Ueltzhöfer",
+            "Herbolzheim, Echle",
+            "Hirschberg, Zeilfelder",
+            "Hirschberg-Großsachsen, Zeilfelder",
+            "Hösbach, Stenger",
+            "Immendingen, Milkau",
+            "Jestetten, EDEKA",
+            "Kaisersesch, Ziegler",
+            "Kaiserslautern, CAP Rockenhausen",
+            "Kelberg, Borsch",
+            "Kirchheim, Marktkauf",
+            "Köngen, E-center",
+            "Konz-Könen, E-center",
+            "Laichingen, E-center",
+            "Laufenburg, E-center",
+            "Laupheim, E-center",
+            "Leinfelden-Echterdingen, Bauer E-center",
+            "Leinfelden-Echterdingen, Bauer EDEKA",
+            "Lichtenau, Liebich",
+            "Lottstetten, EDEKA",
+            "Mainz-Drais, Matthes",
+            "Mannheim-Neuostheim, E-center",
+            "Miltenberg, Stenger",
+            "Monsheim, Wollny",
+            "Mössingen, E-center",
+            "Münster, Kampmann",
+            "Mutterstadt, Stiegler",
+            "Neuenbürg, Berger",
+            "Neuhausen, Fleck",
+            "Nürtingen, Sigel",
+            "Ostfildern, E-center",
+            "Osthofen, Wollny",
+            "Pforzheim-Huchenfeld, Berger",
+            "Pfullendorf, EDEKA",
+            "Pfullingen, E-center",
+            "Pfungstadt, Leist & Steiner",
+            "Raunheim, Haller",
+            "Remseck-Hochberg, E-center",
+            "Riedlingen, Sigmund",
+            "Rottenburg, EDEKA",
+            "Schömberg, Koch",
+            "Schorndorf, Capurso",
+            "Senden Iller, Daus",
+            "Singen, E-center",
+            "Speyer, Stiegler",
+            "Steinmauern, Huck",
+            "Stuttgart, EDEKA",
+            "Stuttgart, Fleck",
+            "Stuttgart-Fasanenhof, Fleck",
+            "Stuttgart-Feuerbach, Jäger",
+            "Stuttgart-Riedenberg, Bauer",
+            "Stuttgart-Sillenbuch, Bauer",
+            "Trossingen, Milkau",
+            "Tuttlingen, Milkau",
+            "Überlingen Bodensee, EDEKA",
+            "Überlingen, E-center",
+            "Ulm a.d.Donau-Lehr, E-center",
+            "Waiblingen, Reichert",
+            "Waldachtal Hörschweiler, Rentschler",
+            "Waldenbuch, Hacker",
+            "Waldshut-Tiengen, E-center",
+            "Wallhalben, Hollinger",
+            "Weil am Rhein, Marktkauf",
+            "Weil der Stadt, E-center",
+            "Weil im Schönbuch, Hacker",
+            "Weinstadt-Endersbach, Reichert",
+            "Weinstadt-Großheppach, EDEKA",
+            "Wittlich, E-center"
+        ];
+
+        const datalist = document.getElementById("maerkteList");
+        maerkte.forEach(markt => {
+            const option = document.createElement("option");
+            option.value = markt;
+            datalist.appendChild(option);
+        });
+
+        function buildPlusEmail(email, index) {
+            const atIndex = email.indexOf("@");
+            if (atIndex <= 0) return `${email}+${index}`;
+
+            const localPart = email.substring(0, atIndex);
+            const domainPart = email.substring(atIndex);
+            const cleanLocal = localPart.includes("+") ? localPart.split("+")[0] : localPart;
+
+            return `${cleanLocal}+${index}${domainPart}`;
+        }
+
+        const etAnswer1 = document.getElementById("etAnswer1");
+        const etAnswer2 = document.getElementById("etAnswer2");
+        const etStartDate = document.getElementById("etStartDate");
+        const etSubmitDate = document.getElementById("etSubmitDate");
+        const etRepeatCount = document.getElementById("etRepeatCount");
+        const btnSend = document.getElementById("btnSend");
+        const tvStatus = document.getElementById("tvStatus");
+
+        btnSend.addEventListener("click", async () => {
+            const a1 = etAnswer1.value.trim();
+            const baseEmail = etAnswer2.value.trim() || "wekeytug@fuwamofu.com";
+            const startDate = etStartDate.value.trim();
+            const submitDate = etSubmitDate.value.trim();
+            const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
+            const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
+
+            etAnswer2.value = "";
+            btnSend.disabled = true;
+            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe...`;
+
+            const logs = [];
+
+            for (let i = 1; i <= repeatCount; i++) {
+                const numberedEmail = buildPlusEmail(baseEmail, i);
+                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Läuft...`].join("\n");
+
+                const answersArray = [
+                    {
+                        questionId: "r9f72a3a2d06f43d999369da8cedd2bb4",
+                        answer1: a1
+                    },
+                    {
+                        questionId: "reb0fe8e35f5d4c0f987fb7277da2c530",
+                        answer1: numberedEmail
+                    }
+                ];
+
+                const bodyJson = JSON.stringify({
+                    startDate: startDate,
+                    submitDate: submitDate,
+                    answers: JSON.stringify(answersArray)
+                });
+
+                try {
+                    const response = await fetch(endpointUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: bodyJson
+                    });
+
+                    if (response.ok) {
+                        logs.push(`[${i}/${repeatCount}] Erfolgreich`);
+                    } else {
+                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status})`);
+                    }
+                } catch (err) {
+                    logs.push(`[${i}/${repeatCount}] Fehler`);
+                }
+            }
+
+            tvStatus.textContent = logs.join("\n");
+            btnSend.disabled = false;
+        });
+    </script>
+</body>
+</html>
