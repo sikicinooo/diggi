@@ -25,6 +25,14 @@
             flex-direction: column;
             gap: 12px;
         }
+        .sender-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        body.codes-only .sender-section {
+            display: none;
+        }
         .card {
             background-color: #FFFFFF;
             border: 1px solid #E2E8F0;
@@ -255,29 +263,31 @@
 </head>
 <body>
     <div class="container">
-        <!-- 1. Titel: Ort -->
-        <div class="card">
-            <label for="etAnswer1" class="card-title">Ort</label>
-            <select id="etAnswer1"></select>
+        <div id="senderSection" class="sender-section">
+            <!-- 1. Titel: Ort -->
+            <div class="card">
+                <label for="etAnswer1" class="card-title">Ort</label>
+                <select id="etAnswer1"></select>
+            </div>
+
+            <!-- 2. Titel: E-Mail -->
+            <div class="card">
+                <label for="etAnswer2" class="card-title">E-Mail</label>
+                <input type="email" id="etAnswer2" value="" placeholder="Basis-E-Mail (optional, Standard: wernermichael2222@gmail.com)" autocomplete="off">
+            </div>
+
+            <!-- Durchläufe -->
+            <div class="card">
+                <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+Ort_1, +Ort_2, ...)</label>
+                <input type="number" id="etRepeatCount" value="5" min="1">
+            </div>
+
+            <!-- Senden-Button -->
+            <button id="btnSend" class="btn-primary" type="button">Absenden</button>
+
+            <!-- Status-Log -->
+            <div id="tvStatus" class="status-card">Bereit.</div>
         </div>
-
-        <!-- 2. Titel: E-Mail -->
-        <div class="card">
-            <label for="etAnswer2" class="card-title">E-Mail</label>
-            <input type="email" id="etAnswer2" value="" placeholder="Basis-E-Mail (optional, Standard: wernermichael2222@gmail.com)" autocomplete="off">
-        </div>
-
-        <!-- Durchläufe -->
-        <div class="card">
-            <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+Ort_1, +Ort_2, ...)</label>
-            <input type="number" id="etRepeatCount" value="5" min="1">
-        </div>
-
-        <!-- Senden-Button -->
-        <button id="btnSend" class="btn-primary" type="button">Absenden</button>
-
-        <!-- Status-Log -->
-        <div id="tvStatus" class="status-card">Bereit.</div>
 
         <!-- Tab 1: E-Mail-Inhalte -->
         <div id="panelEmails" class="card tab-panel active">
@@ -453,6 +463,7 @@
 
         function switchBottomTab(tabName) {
             const isCodes = tabName === "codes";
+            document.body.classList.toggle("codes-only", isCodes);
             document.getElementById("tabBtnEmails").classList.toggle("active", !isCodes);
             document.getElementById("tabBtnCodes").classList.toggle("active", isCodes);
             document.getElementById("panelEmails").classList.toggle("active", !isCodes);
