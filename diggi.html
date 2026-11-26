@@ -14,7 +14,7 @@
         body {
             background-color: #F3F5F7;
             color: #1E293B;
-            padding: 16px;
+            padding: 16px 16px 88px;
             display: flex;
             justify-content: center;
         }
@@ -71,10 +71,10 @@
         input::placeholder {
             color: #94A3B8;
         }
-        button {
+        .btn-primary {
             width: 100%;
             height: 52px;
-            background-color: green;
+            background-color: #F97316;
             color: #FFFFFF;
             font-size: 16px;
             font-weight: 700;
@@ -83,10 +83,10 @@
             cursor: pointer;
             transition: background-color 0.15s ease, opacity 0.15s ease;
         }
-        button:hover:not(:disabled) {
+        .btn-primary:hover:not(:disabled) {
             background-color: #EA580C;
         }
-        button:disabled {
+        .btn-primary:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
@@ -141,6 +141,97 @@
             white-space: pre-wrap;
             word-break: break-word;
         }
+        .code-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .code-pill {
+            display: inline-block;
+            background-color: #FFF7ED;
+            border: 1px solid #FDBA74;
+            color: #C2410C;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 8px;
+            word-break: break-all;
+        }
+        .btn-copy {
+            background-color: #0F172A;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .btn-copy:hover {
+            background-color: #334155;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #FFFFFF;
+            border-top: 1px solid #E2E8F0;
+            box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+        }
+        .bottom-nav-inner {
+            width: 100%;
+            max-width: 540px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 8px 12px;
+        }
+        .bottom-tab {
+            height: 46px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background-color: transparent;
+            color: #475569;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .bottom-tab.active {
+            background-color: #FFF7ED;
+            border-color: #FDBA74;
+            color: #EA580C;
+        }
+        .tab-badge {
+            background-color: #E2E8F0;
+            color: #0F172A;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+        }
+        .bottom-tab.active .tab-badge {
+            background-color: #F97316;
+            color: #FFFFFF;
+        }
     </style>
 </head>
 <body>
@@ -164,13 +255,13 @@
         </div>
 
         <!-- Senden-Button -->
-        <button id="btnSend" type="button">Absenden</button>
+        <button id="btnSend" class="btn-primary" type="button">Absenden</button>
 
         <!-- Status-Log -->
         <div id="tvStatus" class="status-card">Bereit.</div>
 
-        <!-- E-Mail-Inhalte unter dem Formular -->
-        <div class="card">
+        <!-- Tab 1: E-Mail-Inhalte -->
+        <div id="panelEmails" class="card tab-panel active">
             <div class="results-header">
                 <span class="results-title">E-Mail-Inhalte</span>
                 <span id="counterInfo" class="results-meta">Zähler: 0</span>
@@ -181,7 +272,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab 2: Extrahierte Codes -->
+        <div id="panelCodes" class="card tab-panel">
+            <div class="results-header">
+                <span class="results-title">Codes</span>
+                <span id="codesMeta" class="results-meta">0 Treffer</span>
+            </div>
+            <div id="codesResults" class="results-list">
+                <div class="result-item">
+                    <div class="result-content">Noch keine Codes extrahiert.</div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" aria-label="Bereichswechsel">
+        <div class="bottom-nav-inner">
+            <button id="tabBtnEmails" class="bottom-tab active" type="button">
+                <span>E-Mail-Inhalte</span>
+            </button>
+            <button id="tabBtnCodes" class="bottom-tab" type="button">
+                <span>Codes</span>
+                <span id="codesBadge" class="tab-badge">0</span>
+            </button>
+        </div>
+    </nav>
 
     <script>
         const workerBaseUrl = "https://diggi-proxy.sikicinooo.workers.dev";
@@ -309,6 +426,46 @@
         let entries = [];
         let pollTimer = null;
 
+        function switchBottomTab(tabName) {
+            const isCodes = tabName === "codes";
+            document.getElementById("tabBtnEmails").classList.toggle("active", !isCodes);
+            document.getElementById("tabBtnCodes").classList.toggle("active", isCodes);
+            document.getElementById("panelEmails").classList.toggle("active", !isCodes);
+            document.getElementById("panelCodes").classList.toggle("active", isCodes);
+        }
+
+        document.getElementById("tabBtnEmails").addEventListener("click", () => switchBottomTab("emails"));
+        document.getElementById("tabBtnCodes").addEventListener("click", () => switchBottomTab("codes"));
+
+        function extractCodesFromText(text) {
+            if (!text || text.startsWith("Warte auf E-Mail-Inhalt")) return [];
+
+            const found = [];
+            const seen = new Set();
+
+            const addMatch = (val) => {
+                const clean = (val || "").trim();
+                if (!clean || seen.has(clean)) return;
+                seen.add(clean);
+                found.push(clean);
+            };
+
+            // 1. Explizite Muster wie "Code: 123456", "PIN = AB12CD", "OTP 849201"
+            const labeledRegex = /\b(?:code|pin|otp|token|aktivierungscode|best[aä]tigungscode)\b\s*[:=#-]?\s*([A-Za-z0-9_-]{4,24})/gi;
+            let m;
+            while ((m = labeledRegex.exec(text)) !== null) {
+                addMatch(m[1]);
+            }
+
+            // 2. Fallback: eigenständige 4- bis 10-stellige Ziffern- oder Großbuchstaben-Codes
+            const standaloneRegex = /\b(?=[A-Z0-9]{4,10}\b)(?=[A-Z0-9]*[0-9])[A-Z0-9]+\b/g;
+            while ((m = standaloneRegex.exec(text)) !== null) {
+                addMatch(m[0]);
+            }
+
+            return found;
+        }
+
         function getSavedCounter() {
             const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
             if (raw === null) return 0;
@@ -358,6 +515,75 @@
             return `${cleanLocal}+${safeOrt}_${index}${domainPart}`;
         }
 
+        function renderCodesTab() {
+            const codesResults = document.getElementById("codesResults");
+            const codesMeta = document.getElementById("codesMeta");
+            const codesBadge = document.getElementById("codesBadge");
+
+            const rows = [];
+            entries.forEach(entry => {
+                const codes = extractCodesFromText(entry.content);
+                codes.forEach(code => {
+                    rows.push({
+                        index: entry.index,
+                        email: entry.email,
+                        code
+                    });
+                });
+            });
+
+            codesMeta.textContent = `${rows.length} ${rows.length === 1 ? "Treffer" : "Treffer"}`;
+            codesBadge.textContent = String(rows.length);
+
+            codesResults.innerHTML = "";
+            if (!rows.length) {
+                codesResults.innerHTML = `
+                    <div class="result-item">
+                        <div class="result-content">Noch keine Codes extrahiert.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            rows.forEach(row => {
+                const item = document.createElement("div");
+                item.className = "result-item";
+
+                const emailDiv = document.createElement("div");
+                emailDiv.className = "result-email";
+                emailDiv.textContent = `#${row.index} – ${row.email}`;
+
+                const codeRow = document.createElement("div");
+                codeRow.className = "code-row";
+
+                const pill = document.createElement("span");
+                pill.className = "code-pill";
+                pill.textContent = row.code;
+
+                const copyBtn = document.createElement("button");
+                copyBtn.type = "button";
+                copyBtn.className = "btn-copy";
+                copyBtn.textContent = "Kopieren";
+                copyBtn.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(row.code);
+                        copyBtn.textContent = "Kopiert!";
+                        setTimeout(() => {
+                            copyBtn.textContent = "Kopieren";
+                        }, 1500);
+                    } catch {
+                        copyBtn.textContent = "Fehler";
+                    }
+                });
+
+                codeRow.appendChild(pill);
+                codeRow.appendChild(copyBtn);
+                item.appendChild(emailDiv);
+                item.appendChild(codeRow);
+                codesResults.appendChild(item);
+            });
+        }
+
         function renderEmailEntries() {
             const emailResults = document.getElementById("emailResults");
             emailResults.innerHTML = "";
@@ -368,6 +594,7 @@
                         <div class="result-content">Noch keine Durchläufe gesendet.</div>
                     </div>
                 `;
+                renderCodesTab();
                 return;
             }
 
@@ -387,6 +614,8 @@
                 item.appendChild(contentDiv);
                 emailResults.appendChild(item);
             });
+
+            renderCodesTab();
         }
 
         async function pollMessages() {
@@ -445,6 +674,7 @@
         const tvStatus = document.getElementById("tvStatus");
 
         updateCounterDisplay();
+        renderCodesTab();
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
@@ -455,76 +685,4 @@
             etAnswer2.value = "";
             btnSend.disabled = true;
 
-            let currentCounter = getSavedCounter();
-            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
-
-            const logs = [];
-
-            for (let i = 1; i <= repeatCount; i++) {
-                currentCounter += 1;
-                setSavedCounter(currentCounter);
-
-                const numberedEmail = buildLocationPlusEmail(baseEmail, a1, currentCounter);
-                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
-
-                const answersArray = [
-                    {
-                        questionId: "r9f72a3a2d06f43d999369da8cedd2bb4",
-                        answer1: a1
-                    },
-                    {
-                        questionId: "reb0fe8e35f5d4c0f987fb7277da2c530",
-                        answer1: numberedEmail
-                    }
-                ];
-
-                const bodyJson = JSON.stringify({
-                    startDate: defaultStartDate,
-                    submitDate: defaultSubmitDate,
-                    answers: JSON.stringify(answersArray)
-                });
-
-                try {
-                    const response = await fetch(endpointUrl, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Accept": "application/json"
-                        },
-                        body: bodyJson
-                    });
-
-                    if (response.ok) {
-                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${numberedEmail})`);
-                        entries.push({
-                            index: currentCounter,
-                            email: numberedEmail,
-                            content: "Warte auf E-Mail-Inhalt..."
-                        });
-                    } else {
-                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
-                        entries.push({
-                            index: currentCounter,
-                            email: numberedEmail,
-                            content: `Request fehlgeschlagen (HTTP ${response.status})`
-                        });
-                    }
-                } catch {
-                    logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
-                    entries.push({
-                        index: currentCounter,
-                        email: numberedEmail,
-                        content: "Netzwerk-/Request-Fehler"
-                    });
-                }
-
-                renderEmailEntries();
-            }
-
-            tvStatus.textContent = logs.join("\n");
-            btnSend.disabled = false;
-            startPolling();
-        });
-    </script>
-</body>
-</html>
+            let currentCounter = getSaved
