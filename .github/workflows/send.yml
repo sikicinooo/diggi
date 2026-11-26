@@ -1,0 +1,187 @@
+name: Diggi Sender
+
+on:
+  workflow_dispatch:
+    inputs:
+      ort:
+        description: "Ort (Markt auswählen)"
+        required: true
+        type: choice
+        default: "Aldingen, Milkau"
+        options:
+          - "Aldingen, Milkau"
+          - "Altdorf, Hacker"
+          - "Altensteig, Rentschler"
+          - "Amorbach, Werner"
+          - "Aschaffenburg, Stenger"
+          - "Balingen, E-center"
+          - "Besigheim, E-center"
+          - "Birkenau, Bylitza"
+          - "Birkenfeld, Berger"
+          - "Bitburg, E-center"
+          - "Blumberg, Milkau"
+          - "Bondorf, Rentschler"
+          - "Brücken, CAP Rockenhausen"
+          - "Dietenheim, Daus"
+          - "Durmersheim, Huck"
+          - "Ehingen, Peterka"
+          - "Eislingen, Gebauer"
+          - "Elchesheim-Illingen, Huck"
+          - "Emmingen-Liptingen, Milkau"
+          - "Eppingen, Sommer"
+          - "Esslingen a.Neckar, Sigel"
+          - "Eutingen im Gäu, Rentschler"
+          - "Filderstadt, Capurso"
+          - "Friedrichshafen, Marktkauf"
+          - "Gäufelden-Nebringen, Rentschler"
+          - "Geisingen, Milkau"
+          - "Gelnhausen-Meerholz, Lauber"
+          - "Grafenau-Döffingen, Hacker"
+          - "Großbottwar, Brenner"
+          - "Großostheim, Stenger"
+          - "Groß-Zimmern, Haller"
+          - "Heidesheim am Rhein, Leist & Steiner"
+          - "Heilbronn-Sontheim, Ueltzhöfer"
+          - "Herbolzheim, Echle"
+          - "Hirschberg, Zeilfelder"
+          - "Hirschberg-Großsachsen, Zeilfelder"
+          - "Hösbach, Stenger"
+          - "Immendingen, Milkau"
+          - "Jestetten, EDEKA"
+          - "Kaisersesch, Ziegler"
+          - "Kaiserslautern, CAP Rockenhausen"
+          - "Kelberg, Borsch"
+          - "Kirchheim, Marktkauf"
+          - "Köngen, E-center"
+          - "Konz-Könen, E-center"
+          - "Laichingen, E-center"
+          - "Laufenburg, E-center"
+          - "Laupheim, E-center"
+          - "Leinfelden-Echterdingen, Bauer E-center"
+          - "Leinfelden-Echterdingen, Bauer EDEKA"
+          - "Lichtenau, Liebich"
+          - "Lottstetten, EDEKA"
+          - "Mainz-Drais, Matthes"
+          - "Mannheim-Neuostheim, E-center"
+          - "Miltenberg, Stenger"
+          - "Monsheim, Wollny"
+          - "Mössingen, E-center"
+          - "Münster, Kampmann"
+          - "Mutterstadt, Stiegler"
+          - "Neuenbürg, Berger"
+          - "Neuhausen, Fleck"
+          - "Nürtingen, Sigel"
+          - "Ostfildern, E-center"
+          - "Osthofen, Wollny"
+          - "Pforzheim-Huchenfeld, Berger"
+          - "Pfullendorf, EDEKA"
+          - "Pfullingen, E-center"
+          - "Pfungstadt, Leist & Steiner"
+          - "Raunheim, Haller"
+          - "Remseck-Hochberg, E-center"
+          - "Riedlingen, Sigmund"
+          - "Rottenburg, EDEKA"
+          - "Schömberg, Koch"
+          - "Schorndorf, Capurso"
+          - "Senden Iller, Daus"
+          - "Singen, E-center"
+          - "Speyer, Stiegler"
+          - "Steinmauern, Huck"
+          - "Stuttgart, EDEKA"
+          - "Stuttgart, Fleck"
+          - "Stuttgart-Fasanenhof, Fleck"
+          - "Stuttgart-Feuerbach, Jäger"
+          - "Stuttgart-Riedenberg, Bauer"
+          - "Stuttgart-Sillenbuch, Bauer"
+          - "Trossingen, Milkau"
+          - "Tuttlingen, Milkau"
+          - "Überlingen Bodensee, EDEKA"
+          - "Überlingen, E-center"
+          - "Ulm a.d.Donau-Lehr, E-center"
+          - "Waiblingen, Reichert"
+          - "Waldachtal Hörschweiler, Rentschler"
+          - "Waldenbuch, Hacker"
+          - "Waldshut-Tiengen, E-center"
+          - "Wallhalben, Hollinger"
+          - "Weil am Rhein, Marktkauf"
+          - "Weil der Stadt, E-center"
+          - "Weil im Schönbuch, Hacker"
+          - "Weinstadt-Endersbach, Reichert"
+          - "Weinstadt-Großheppach, EDEKA"
+          - "Wittlich, E-center"
+      email:
+        description: "Basis-E-Mail (leer lassen für Standard: wekeytug@fuwamofu.com)"
+        required: false
+        type: string
+        default: ""
+      startDate:
+        description: "startDate"
+        required: true
+        type: string
+        default: "2026-11-24T11:22:28.136Z"
+      submitDate:
+        description: "submitDate"
+        required: true
+        type: string
+        default: "2026-11-24T14:58:03.704Z"
+      count:
+        description: "Anzahl Durchläufe (+1, +2, ...)"
+        required: true
+        type: string
+        default: "3"
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Requests absenden
+        env:
+          ORT: ${{ github.event.inputs.ort }}
+          BASE_EMAIL: ${{ github.event.inputs.email }}
+          START_DATE: ${{ github.event.inputs.startDate }}
+          SUBMIT_DATE: ${{ github.event.inputs.submitDate }}
+          COUNT: ${{ github.event.inputs.count }}
+        run: |
+          python3 - << 'EOF'
+          import json, os, urllib.request, urllib.error
+
+          url = "https://forms.guest.usercontent.microsoft/formapi/api/857a7b86-2d66-46f2-92e1-25be0c27e398/users/66017ba1-3bde-4bdd-8828-75d8a82803bf/forms('hnt6hWYt8kaS4SW-DCfjmKF7AWbeO91LiCh12KgoA79UMDdSRkJOWEhYU0NaSzVJVVRWVjYzUVBPVy4u')/responses"
+          ort = os.environ["ORT"].strip()
+          base_email = os.environ["BASE_EMAIL"].strip() or "wekeytug@fuwamofu.com"
+          start_date = os.environ["START_DATE"].strip()
+          submit_date = os.environ["SUBMIT_DATE"].strip()
+          count = max(1, int(os.environ.get("COUNT", "1")))
+
+          def plus_email(email, idx):
+              if "@" not in email:
+                  return f"{email}+{idx}"
+              local, domain = email.split("@", 1)
+              clean_local = local.split("+")[0]
+              return f"{clean_local}+{idx}@{domain}"
+
+          for i in range(1, count + 1):
+              mail = plus_email(base_email, i)
+              answers = json.dumps([
+                  {"questionId": "r9f72a3a2d06f43d999369da8cedd2bb4", "answer1": ort},
+                  {"questionId": "reb0fe8e35f5d4c0f987fb7277da2c530", "answer1": mail},
+              ])
+              payload = json.dumps({
+                  "startDate": start_date,
+                  "submitDate": submit_date,
+                  "answers": answers,
+              }).encode("utf-8")
+
+              req = urllib.request.Request(
+                  url,
+                  data=payload,
+                  headers={"Content-Type": "application/json", "Accept": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      print(f"[{i}/{count}] Erfolgreich")
+              except urllib.error.HTTPError as e:
+                  print(f"[{i}/{count}] Fehler (HTTP {e.code})")
+              except Exception:
+                  print(f"[{i}/{count}] Fehler")
+          EOF
