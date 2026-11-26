@@ -39,22 +39,8 @@
             margin-bottom: 8px;
             display: block;
         }
-        .field-label {
-            font-size: 13px;
-            font-weight: 700;
-            color: #475569;
-            margin-bottom: 4px;
-            display: block;
-        }
-        .field-group {
-            margin-bottom: 12px;
-        }
-        .field-group:last-child {
-            margin-bottom: 0;
-        }
         input[type="text"],
         input[type="email"],
-        input[type="number"],
         select {
             width: 100%;
             height: 46px;
@@ -123,22 +109,6 @@
             <input type="email" id="etAnswer2" value="" placeholder="z.B. diggi@cool.de">
         </div>
 
-        <!-- Zeitstempel & Durchläufe -->
-        <div class="card">
-            <div class="field-group">
-                <label for="etStartDate" class="field-label">startDate</label>
-                <input type="text" id="etStartDate" value="2026-11-24T11:22:28.136Z">
-            </div>
-            <div class="field-group">
-                <label for="etSubmitDate" class="field-label">submitDate</label>
-                <input type="text" id="etSubmitDate" value="2026-11-24T14:58:03.704Z">
-            </div>
-            <div class="field-group">
-                <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+1, +2, ...)</label>
-                <input type="number" id="etRepeatCount" value="5" min="1">
-            </div>
-        </div>
-
         <!-- Senden-Button -->
         <button id="btnSend" type="button">Absenden</button>
 
@@ -148,6 +118,9 @@
 
     <script>
         const endpointUrl = "https://diggi-proxy.sikicinooo.workers.dev";
+        const defaultStartDate = "2026-11-24T11:22:28.136Z";
+        const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
+        const defaultRepeatCount = 5;
 
         const maerkte = [
             "Aldingen, Milkau",
@@ -276,19 +249,15 @@
 
         const etAnswer1 = document.getElementById("etAnswer1");
         const etAnswer2 = document.getElementById("etAnswer2");
-        const etStartDate = document.getElementById("etStartDate");
-        const etSubmitDate = document.getElementById("etSubmitDate");
-        const etRepeatCount = document.getElementById("etRepeatCount");
         const btnSend = document.getElementById("btnSend");
         const tvStatus = document.getElementById("tvStatus");
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
             const baseEmail = etAnswer2.value.trim() || "wekeytug@fuwamofu.com";
-            const startDate = etStartDate.value.trim();
-            const submitDate = etSubmitDate.value.trim();
-            const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
-            const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
+            const startDate = defaultStartDate;
+            const submitDate = defaultSubmitDate;
+            const repeatCount = defaultRepeatCount;
 
             etAnswer2.value = "";
             btnSend.disabled = true;
