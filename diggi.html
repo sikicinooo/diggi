@@ -154,9 +154,10 @@
             border: 1px solid #FDBA74;
             color: #C2410C;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
-            padding: 4px 10px;
+            letter-spacing: 0.04em;
+            padding: 5px 12px;
             border-radius: 8px;
             word-break: break-all;
         }
@@ -165,7 +166,7 @@
             color: #FFFFFF;
             border: none;
             border-radius: 8px;
-            padding: 6px 10px;
+            padding: 7px 11px;
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
@@ -281,7 +282,7 @@
             </div>
             <div id="codesResults" class="results-list">
                 <div class="result-item">
-                    <div class="result-content">Noch keine Codes extrahiert.</div>
+                    <div class="result-content">Noch keine 10-stelligen Codes extrahiert.</div>
                 </div>
             </div>
         </div>
@@ -437,28 +438,23 @@
         document.getElementById("tabBtnEmails").addEventListener("click", () => switchBottomTab("emails"));
         document.getElementById("tabBtnCodes").addEventListener("click", () => switchBottomTab("codes"));
 
-        function extractCodesFromText(text) {
+        function extractTenCharCodes(text) {
             if (!text || text.startsWith("Warte auf E-Mail-Inhalt")) return [];
 
             const found = [];
             const seen = new Set();
+            const regex = /\b[A-Z0-9]{10}\b/g;
 
-            const addMatch = (val) => {
-                const clean = (val || "").trim();
-                if (!clean || seen.has(clean)) return;
-                seen.add(clean);
-                found.push(clean);
-            };
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const candidate = match[0];
+                const hasLetter = /[A-Z]/.test(candidate);
+                const hasDigit = /[0-9]/.test(candidate);
 
-            const labeledRegex = /\b(?:code|pin|otp|token|aktivierungscode|best[aä]tigungscode)\b\s*[:=#-]?\s*([A-Za-z0-9_-]{4,24})/gi;
-            let m;
-            while ((m = labeledRegex.exec(text)) !== null) {
-                addMatch(m[1]);
-            }
-
-            const standaloneRegex = /\b(?=[A-Z0-9]{4,10}\b)(?=[A-Z0-9]*[0-9])[A-Z0-9]+\b/g;
-            while ((m = standaloneRegex.exec(text)) !== null) {
-                addMatch(m[0]);
+                if (hasLetter && hasDigit && !seen.has(candidate)) {
+                    seen.add(candidate);
+                    found.push(candidate);
+                }
             }
 
             return found;
@@ -520,7 +516,7 @@
 
             const rows = [];
             entries.forEach(entry => {
-                const codes = extractCodesFromText(entry.content);
+                const codes = extractTenCharCodes(entry.content);
                 codes.forEach(code => {
                     rows.push({
                         index: entry.index,
@@ -537,7 +533,7 @@
             if (!rows.length) {
                 codesResults.innerHTML = `
                     <div class="result-item">
-                        <div class="result-content">Noch keine Codes extrahiert.</div>
+                        <div class="result-content">Noch keine 10-stelligen Codes extrahiert.</div>
                     </div>
                 `;
                 return;
