@@ -75,7 +75,7 @@
             width: 100%;
             height: 52px;
             background-color: #F97316;
-            color: green;
+            color: #FFFFFF;
             font-size: 16px;
             font-weight: 700;
             border: none;
@@ -138,6 +138,8 @@
             color: #475569;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
     </style>
 </head>
@@ -157,7 +159,7 @@
 
         <!-- Durchläufe -->
         <div class="card">
-            <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+1, +2, ...)</label>
+            <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+Ort_1, +Ort_2, ...)</label>
             <input type="number" id="etRepeatCount" value="5" min="1">
         </div>
 
@@ -182,10 +184,13 @@
     </div>
 
     <script>
-        const endpointUrl = "https://diggi-proxy.sikicinooo.workers.dev";
+        const workerBaseUrl = "https://diggi-proxy.sikicinooo.workers.dev";
+        const endpointUrl = `${workerBaseUrl}/`;
+        const messagesUrl = `${workerBaseUrl}/messages`;
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
         const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
+        const DEFAULT_BASE_EMAIL = "wekeytug@fuwamofu.com";
 
         const maerkte = [
             "Aldingen, Milkau",
@@ -301,6 +306,9 @@
             selectOrt.appendChild(option);
         });
 
+        let entries = [];
+        let pollTimer = null;
+
         function getSavedCounter() {
             const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
             if (raw === null) return 0;
@@ -320,20 +328,48 @@
             }
         }
 
-        function buildPlusEmail(email, index) {
+        function formatOrtForEmail(ortValue) {
+            const rawCity = (ortValue || "").split(",")[0].trim();
+            const normalized = rawCity
+                .replace(/ä/g, "ae")
+                .replace(/ö/g, "oe")
+                .replace(/ü/g, "ue")
+                .replace(/Ä/g, "Ae")
+                .replace(/Ö/g, "Oe")
+                .replace(/Ü/g, "Ue")
+                .replace(/ß/g, "ss")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^A-Za-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+
+            return normalized || "Ort";
+        }
+
+        function buildLocationPlusEmail(email, ortValue, index) {
             const atIndex = email.indexOf("@");
-            if (atIndex <= 0) return `${email}+${index}`;
+            const safeOrt = formatOrtForEmail(ortValue);
+            if (atIndex <= 0) return `${email}+${safeOrt}_${index}`;
 
             const localPart = email.substring(0, atIndex);
             const domainPart = email.substring(atIndex);
             const cleanLocal = localPart.includes("+") ? localPart.split("+")[0] : localPart;
 
-            return `${cleanLocal}+${index}${domainPart}`;
+            return `${cleanLocal}+${safeOrt}_${index}${domainPart}`;
         }
 
-        function renderEmailEntries(entries) {
+        function renderEmailEntries() {
             const emailResults = document.getElementById("emailResults");
             emailResults.innerHTML = "";
+
+            if (!entries.length) {
+                emailResults.innerHTML = `
+                    <div class="result-item">
+                        <div class="result-content">Noch keine Durchläufe gesendet.</div>
+                    </div>
+                `;
+                return;
+            }
 
             entries.forEach(entry => {
                 const item = document.createElement("div");
@@ -353,6 +389,55 @@
             });
         }
 
+        async function pollMessages() {
+            const targetEmails = entries.map(e => e.email.toLowerCase());
+            if (!targetEmails.length) return;
+
+            try {
+                const query = encodeURIComponent(targetEmails.join(","));
+                const res = await fetch(`${messagesUrl}?emails=${query}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                const results = data && data.results ? data.results : {};
+                let changed = false;
+
+                entries = entries.map(entry => {
+                    const hit = results[entry.email.toLowerCase()];
+                    if (hit && hit.content && entry.content !== hit.content) {
+                        changed = true;
+                        return {
+                            ...entry,
+                            content: hit.content
+                        };
+                    }
+                    return entry;
+                });
+
+                if (changed) {
+                    renderEmailEntries();
+                }
+
+                const allReceived = entries.every(
+                    e => !e.content.startsWith("Warte auf E-Mail-Inhalt")
+                );
+                if (allReceived && pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+            } catch {
+                // Beim nächsten Intervall erneut versuchen
+            }
+        }
+
+        function startPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+            }
+            pollMessages();
+            pollTimer = setInterval(pollMessages, 3000);
+        }
+
         const etAnswer1 = document.getElementById("etAnswer1");
         const etAnswer2 = document.getElementById("etAnswer2");
         const etRepeatCount = document.getElementById("etRepeatCount");
@@ -363,7 +448,7 @@
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
-            const baseEmail = etAnswer2.value.trim() || "wekeytug@fuwamofu.com";
+            const baseEmail = etAnswer2.value.trim() || DEFAULT_BASE_EMAIL;
             const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
             const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
 
@@ -374,13 +459,12 @@
             tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
 
             const logs = [];
-            const entries = [];
 
             for (let i = 1; i <= repeatCount; i++) {
                 currentCounter += 1;
                 setSavedCounter(currentCounter);
 
-                const numberedEmail = buildPlusEmail(baseEmail, currentCounter);
+                const numberedEmail = buildLocationPlusEmail(baseEmail, a1, currentCounter);
                 tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
 
                 const answersArray = [
@@ -415,7 +499,7 @@
                         entries.push({
                             index: currentCounter,
                             email: numberedEmail,
-                            content: "Warte auf E-Mail-Inhalt (Webhook noch nicht verbunden)"
+                            content: "Warte auf E-Mail-Inhalt..."
                         });
                     } else {
                         logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
@@ -425,7 +509,7 @@
                             content: `Request fehlgeschlagen (HTTP ${response.status})`
                         });
                     }
-                } catch (err) {
+                } catch {
                     logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
                     entries.push({
                         index: currentCounter,
@@ -434,11 +518,12 @@
                     });
                 }
 
-                renderEmailEntries(entries);
+                renderEmailEntries();
             }
 
             tvStatus.textContent = logs.join("\n");
             btnSend.disabled = false;
+            startPolling();
         });
     </script>
 </body>
