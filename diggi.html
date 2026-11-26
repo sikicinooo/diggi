@@ -1,139 +1,8 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diggi Forms Sender</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-        body {
-            background-color: #F3F5F7;
-            color: #1E293B;
-            padding: 16px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 540px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .card {
-            background-color: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            border-radius: 14px;
-            padding: 16px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-        .card-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #0F172A;
-            margin-bottom: 8px;
-            display: block;
-        }
-        .field-label {
-            font-size: 13px;
-            font-weight: 700;
-            color: #475569;
-            margin-bottom: 4px;
-            display: block;
-        }
-        input[type="text"],
-        input[type="email"],
-        input[type="number"],
-        select {
-            width: 100%;
-            height: 46px;
-            padding: 0 12px;
-            font-size: 15px;
-            color: #1E293B;
-            background-color: #FFFFFF;
-            border: 1px solid #CBD5E1;
-            border-radius: 8px;
-            outline: none;
-            transition: border-color 0.15s ease;
-        }
-        select {
-            cursor: pointer;
-        }
-        input:focus,
-        select:focus {
-            border-color: #F97316;
-        }
-        input::placeholder {
-            color: #94A3B8;
-        }
-        button {
-            width: 100%;
-            height: 52px;
-            background-color: #F97316;
-            color: #FFFFFF;
-            font-size: 16px;
-            font-weight: 700;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background-color 0.15s ease, opacity 0.15s ease;
-        }
-        button:hover:not(:disabled) {
-            background-color: #EA580C;
-        }
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .status-card {
-            background-color: #1E293B;
-            color: #E2E8F0;
-            border-radius: 14px;
-            padding: 14px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- 1. Titel: Ort -->
-        <div class="card">
-            <label for="etAnswer1" class="card-title">Ort</label>
-            <select id="etAnswer1"></select>
-        </div>
-
-        <!-- 2. Titel: E-Mail -->
-        <div class="card">
-            <label for="etAnswer2" class="card-title">E-Mail</label>
-            <input type="email" id="etAnswer2" value="" placeholder="Basis-E-Mail (optional, Standard: wekeytug@fuwamofu.com)" autocomplete="off">
-        </div>
-
-        <!-- Durchläufe -->
-        <div class="card">
-            <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+1, +2, ...)</label>
-            <input type="number" id="etRepeatCount" value="5" min="1">
-        </div>
-
-        <!-- Senden-Button -->
-        <button id="btnSend" type="button">Absenden</button>
-
-        <!-- Status-Log -->
-        <div id="tvStatus" class="status-card">Bereit.</div>
-    </div>
-
-    <script>
+<script>
         const endpointUrl = "https://diggi-proxy.sikicinooo.workers.dev";
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
+        const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
 
         const maerkte = [
             "Aldingen, Milkau",
@@ -249,6 +118,17 @@
             selectOrt.appendChild(option);
         });
 
+        function getSavedCounter() {
+            const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
+            if (raw === null) return 0;
+            const parsed = parseInt(raw, 10);
+            return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+        }
+
+        function setSavedCounter(value) {
+            localStorage.setItem(COUNTER_STORAGE_KEY, String(value));
+        }
+
         function buildPlusEmail(email, index) {
             const atIndex = email.indexOf("@");
             if (atIndex <= 0) return `${email}+${index}`;
@@ -274,13 +154,18 @@
 
             etAnswer2.value = "";
             btnSend.disabled = true;
-            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe...`;
+
+            let currentCounter = getSavedCounter();
+            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
 
             const logs = [];
 
             for (let i = 1; i <= repeatCount; i++) {
-                const numberedEmail = buildPlusEmail(baseEmail, i);
-                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Läuft...`].join("\n");
+                currentCounter += 1;
+                setSavedCounter(currentCounter);
+
+                const numberedEmail = buildPlusEmail(baseEmail, currentCounter);
+                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
 
                 const answersArray = [
                     {
@@ -310,12 +195,12 @@
                     });
 
                     if (response.ok) {
-                        logs.push(`[${i}/${repeatCount}] Erfolgreich`);
+                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${numberedEmail})`);
                     } else {
-                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status})`);
+                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
                     }
                 } catch (err) {
-                    logs.push(`[${i}/${repeatCount}] Fehler`);
+                    logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
                 }
             }
 
@@ -323,5 +208,3 @@
             btnSend.disabled = false;
         });
     </script>
-</body>
-</html>
