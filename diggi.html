@@ -54,7 +54,8 @@
         }
         input[type="text"],
         input[type="email"],
-        input[type="number"] {
+        input[type="number"],
+        select {
             width: 100%;
             height: 46px;
             padding: 0 12px;
@@ -66,13 +67,17 @@
             outline: none;
             transition: border-color 0.15s ease;
         }
-        input:focus {
-            border-color: #16A34A;
+        select {
+            cursor: pointer;
+        }
+        input:focus,
+        select:focus {
+            border-color: #F97316;
         }
         input::placeholder {
             color: #94A3B8;
         }
-button {
+        button {
             width: 100%;
             height: 52px;
             background-color: #F97316;
@@ -109,8 +114,7 @@ button {
         <!-- 1. Titel: Ort -->
         <div class="card">
             <label for="etAnswer1" class="card-title">Ort</label>
-            <input type="text" id="etAnswer1" list="maerkteList" value="Aldingen, Milkau" placeholder="Markt auswählen oder eingeben" autocomplete="off">
-            <datalist id="maerkteList"></datalist>
+            <select id="etAnswer1"></select>
         </div>
 
         <!-- 2. Titel: E-Mail -->
@@ -248,11 +252,15 @@ button {
             "Wittlich, E-center"
         ];
 
-        const datalist = document.getElementById("maerkteList");
+        const selectOrt = document.getElementById("etAnswer1");
         maerkte.forEach(markt => {
             const option = document.createElement("option");
             option.value = markt;
-            datalist.appendChild(option);
+            option.textContent = markt;
+            if (markt === "Aldingen, Milkau") {
+                option.selected = true;
+            }
+            selectOrt.appendChild(option);
         });
 
         function buildPlusEmail(email, index) {
