@@ -116,6 +116,854 @@
             font-size: 12px;
             color: #64748B;
         }
+        .filter-box {
+            margin-bottom: 10px;
+        }
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .result-item {
+            border: 1px solid #E2E8F0;
+            background-color: #F8FAFC;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+        .result-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .result-email {
+            font-weight: 700;
+            color: #0F172A;
+            word-break: break-all;
+        }
+        .ort-tag {
+            background-color: #E2E8F0;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+        .result-content {
+            color: #475569;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .code-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .code-pill {
+            display: inline-block;
+            background-color: #FFF7ED;
+            border: 1px solid #FDBA74;
+            color: #C2410C;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 5px 12px;
+            border-radius: 8px;
+            word-break: break-all;
+        }
+        .btn-copy {
+            background-color: #0F172A;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 11px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .btn-copy:hover {
+            background-color: #334155;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #FFFFFF;
+            border-top: 1px solid #E2E8F0;
+            box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+        }
+        .bottom-nav-inner {
+            width: 100%;
+            max-width: 540px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 8px 12px;
+        }
+        .bottom-tab {
+            height: 46px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background-color: transparent;
+            color: #475569;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .bottom-tab.active {
+            background-color: #FFF7ED;
+            border-color: #FDBA74;
+            color: #EA580C;
+        }
+        .tab-badge {
+            background-color: #E2E8F0;
+            color: #0F172A;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+        }
+        .bottom-tab.active .tab-badge {
+            background-color: #F97316;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. Titel: Ort -->
+        <div class="card">
+            <label for="etAnswer1" class="card-title">Ort</label>
+            <select id="etAnswer1"></select>
+        </div>
+
+        <!-- 2. Titel: E-Mail -->
+        <div class="card">
+            <label for="etAnswer2" class="card-title">E-Mail</label>
+            <input type="email" id="etAnswer2" value="" placeholder="Basis-E-Mail (optional, Standard: wernermichael2222@gmail.com)" autocomplete="off">
+        </div>
+
+        <!-- Durchläufe -->
+        <div class="card">
+            <label for="etRepeatCount" class="field-label">Anzahl Durchläufe (+Ort_1, +Ort_2, ...)</label>
+            <input type="number" id="etRepeatCount" value="5" min="1">
+        </div>
+
+        <!-- Senden-Button -->
+        <button id="btnSend" class="btn-primary" type="button">Absenden</button>
+
+        <!-- Status-Log -->
+        <div id="tvStatus" class="status-card">Bereit.</div>
+
+        <!-- Tab 1: E-Mail-Inhalte -->
+        <div id="panelEmails" class="card tab-panel active">
+            <div class="results-header">
+                <span class="results-title">E-Mail-Inhalte</span>
+                <span id="counterInfo" class="results-meta">Zähler: 0</span>
+            </div>
+            <div id="emailResults" class="results-list">
+                <div class="result-item">
+                    <div class="result-content">Noch keine Durchläufe gesendet.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Extrahierte Codes -->
+        <div id="panelCodes" class="card tab-panel">
+            <div class="results-header">
+                <span class="results-title">Codes</span>
+                <span id="codesMeta" class="results-meta">0 Treffer</span>
+            </div>
+            <div class="filter-box">
+                <label for="filterCodeOrt" class="field-label">Nach Ort filtern</label>
+                <select id="filterCodeOrt">
+                    <option value="__ALL__">Alle Orte</option>
+                </select>
+            </div>
+            <div id="codesResults" class="results-list">
+                <div class="result-item">
+                    <div class="result-content">Noch keine 10-stelligen Codes extrahiert.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" aria-label="Bereichswechsel">
+        <div class="bottom-nav-inner">
+            <button id="tabBtnEmails" class="bottom-tab active" type="button">
+                <span>E-Mail-Inhalte</span>
+            </button>
+            <button id="tabBtnCodes" class="bottom-tab" type="button">
+                <span>Codes</span>
+                <span id="codesBadge" class="tab-badge">0</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        const workerBaseUrl = "https://diggi-proxy.sikicinooo.workers.dev";
+        const endpointUrl = `${workerBaseUrl}/`;
+        const messagesUrl = `${workerBaseUrl}/messages`;
+        const defaultStartDate = "2026-11-24T11:22:28.136Z";
+        const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
+        const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
+        const DEFAULT_BASE_EMAIL = "wernermichael2222@gmail.com";
+
+        const maerkte = [
+            "Aldingen, Milkau",
+            "Altdorf, Hacker",
+            "Altensteig, Rentschler",
+            "Amorbach, Werner",
+            "Aschaffenburg, Stenger",
+            "Balingen, E-center",
+            "Besigheim, E-center",
+            "Birkenau, Bylitza",
+            "Birkenfeld, Berger",
+            "Bitburg, E-center",
+            "Blumberg, Milkau",
+            "Bondorf, Rentschler",
+            "Brücken, CAP Rockenhausen",
+            "Dietenheim, Daus",
+            "Durmersheim, Huck",
+            "Ehingen, Peterka",
+            "Eislingen, Gebauer",
+            "Elchesheim-Illingen, Huck",
+            "Emmingen-Liptingen, Milkau",
+            "Eppingen, Sommer",
+            "Esslingen a.Neckar, Sigel",
+            "Eutingen im Gäu, Rentschler",
+            "Filderstadt, Capurso",
+            "Friedrichshafen, Marktkauf",
+            "Gäufelden-Nebringen, Rentschler",
+            "Geisingen, Milkau",
+            "Gelnhausen-Meerholz, Lauber",
+            "Grafenau-Döffingen, Hacker",
+            "Großbottwar, Brenner",
+            "Großostheim, Stenger",
+            "Groß-Zimmern, Haller",
+            "Heidesheim am Rhein, Leist & Steiner",
+            "Heilbronn-Sontheim, Ueltzhöfer",
+            "Herbolzheim, Echle",
+            "Hirschberg, Zeilfelder",
+            "Hirschberg-Großsachsen, Zeilfelder",
+            "Hösbach, Stenger",
+            "Immendingen, Milkau",
+            "Jestetten, EDEKA",
+            "Kaisersesch, Ziegler",
+            "Kaiserslautern, CAP Rockenhausen",
+            "Kelberg, Borsch",
+            "Kirchheim, Marktkauf",
+            "Köngen, E-center",
+            "Konz-Könen, E-center",
+            "Laichingen, E-center",
+            "Laufenburg, E-center",
+            "Laupheim, E-center",
+            "Leinfelden-Echterdingen, Bauer E-center",
+            "Leinfelden-Echterdingen, Bauer EDEKA",
+            "Lichtenau, Liebich",
+            "Lottstetten, EDEKA",
+            "Mainz-Drais, Matthes",
+            "Mannheim-Neuostheim, E-center",
+            "Miltenberg, Stenger",
+            "Monsheim, Wollny",
+            "Mössingen, E-center",
+            "Münster, Kampmann",
+            "Mutterstadt, Stiegler",
+            "Neuenbürg, Berger",
+            "Neuhausen, Fleck",
+            "Nürtingen, Sigel",
+            "Ostfildern, E-center",
+            "Osthofen, Wollny",
+            "Pforzheim-Huchenfeld, Berger",
+            "Pfullendorf, EDEKA",
+            "Pfullingen, E-center",
+            "Pfungstadt, Leist & Steiner",
+            "Raunheim, Haller",
+            "Remseck-Hochberg, E-center",
+            "Riedlingen, Sigmund",
+            "Rottenburg, EDEKA",
+            "Schömberg, Koch",
+            "Schorndorf, Capurso",
+            "Senden Iller, Daus",
+            "Singen, E-center",
+            "Speyer, Stiegler",
+            "Steinmauern, Huck",
+            "Stuttgart, EDEKA",
+            "Stuttgart, Fleck",
+            "Stuttgart-Fasanenhof, Fleck",
+            "Stuttgart-Feuerbach, Jäger",
+            "Stuttgart-Riedenberg, Bauer",
+            "Stuttgart-Sillenbuch, Bauer",
+            "Trossingen, Milkau",
+            "Tuttlingen, Milkau",
+            "Überlingen Bodensee, EDEKA",
+            "Überlingen, E-center",
+            "Ulm a.d.Donau-Lehr, E-center",
+            "Waiblingen, Reichert",
+            "Waldachtal Hörschweiler, Rentschler",
+            "Waldenbuch, Hacker",
+            "Waldshut-Tiengen, E-center",
+            "Wallhalben, Hollinger",
+            "Weil am Rhein, Marktkauf",
+            "Weil der Stadt, E-center",
+            "Weil im Schönbuch, Hacker",
+            "Weinstadt-Endersbach, Reichert",
+            "Weinstadt-Großheppach, EDEKA",
+            "Wittlich, E-center"
+        ];
+
+        const selectOrt = document.getElementById("etAnswer1");
+        maerkte.forEach(markt => {
+            const option = document.createElement("option");
+            option.value = markt;
+            option.textContent = markt;
+            if (markt === "Aldingen, Milkau") {
+                option.selected = true;
+            }
+            selectOrt.appendChild(option);
+        });
+
+        let entries = [];
+        let pollTimer = null;
+
+        function switchBottomTab(tabName) {
+            const isCodes = tabName === "codes";
+            document.getElementById("tabBtnEmails").classList.toggle("active", !isCodes);
+            document.getElementById("tabBtnCodes").classList.toggle("active", isCodes);
+            document.getElementById("panelEmails").classList.toggle("active", !isCodes);
+            document.getElementById("panelCodes").classList.toggle("active", isCodes);
+        }
+
+        document.getElementById("tabBtnEmails").addEventListener("click", () => switchBottomTab("emails"));
+        document.getElementById("tabBtnCodes").addEventListener("click", () => switchBottomTab("codes"));
+        document.getElementById("filterCodeOrt").addEventListener("change", () => renderCodesTab());
+
+        function extractTenCharCodes(text) {
+            if (!text || text.startsWith("Warte auf E-Mail-Inhalt")) return [];
+
+            const found = [];
+            const seen = new Set();
+            const regex = /\b[A-Z0-9]{10}\b/g;
+
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const candidate = match[0];
+                const hasLetter = /[A-Z]/.test(candidate);
+                const hasDigit = /[0-9]/.test(candidate);
+
+                if (hasLetter && hasDigit && !seen.has(candidate)) {
+                    seen.add(candidate);
+                    found.push(candidate);
+                }
+            }
+
+            return found;
+        }
+
+        function detectOrtFromEmailOrEntry(email, fallbackOrt) {
+            const localPart = (email || "").split("@")[0] || "";
+            const plusMatch = localPart.match(/\+([^@]+)$/);
+            if (plusMatch) {
+                const rawTag = plusMatch[1];
+                const withoutIndex = rawTag.replace(/_\d+$/, "");
+                const matchedMarkt = maerkte.find(
+                    m => formatOrtForEmail(m).toLowerCase() === withoutIndex.toLowerCase()
+                );
+                if (matchedMarkt) return matchedMarkt;
+                if (withoutIndex) return withoutIndex;
+            }
+            return fallbackOrt || "Unbekannt";
+        }
+
+        function getSavedCounter() {
+            const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
+            if (raw === null) return 0;
+            const parsed = parseInt(raw, 10);
+            return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+        }
+
+        function setSavedCounter(value) {
+            localStorage.setItem(COUNTER_STORAGE_KEY, String(value));
+            updateCounterDisplay();
+        }
+
+        function updateCounterDisplay() {
+            const counterInfo = document.getElementById("counterInfo");
+            if (counterInfo) {
+                counterInfo.textContent = `Zähler: ${getSavedCounter()}`;
+            }
+        }
+
+        function formatOrtForEmail(ortValue) {
+            const rawCity = (ortValue || "").split(",")[0].trim();
+            const normalized = rawCity
+                .replace(/ä/g, "ae")
+                .replace(/ö/g, "oe")
+                .replace(/ü/g, "ue")
+                .replace(/Ä/g, "Ae")
+                .replace(/Ö/g, "Oe")
+                .replace(/Ü/g, "Ue")
+                .replace(/ß/g, "ss")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^A-Za-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+
+            return normalized || "Ort";
+        }
+
+        function buildLocationPlusEmail(email, ortValue, index) {
+            const atIndex = email.indexOf("@");
+            const safeOrt = formatOrtForEmail(ortValue);
+            if (atIndex <= 0) return `${email}+${safeOrt}_${index}`;
+
+            const localPart = email.substring(0, atIndex);
+            const domainPart = email.substring(atIndex);
+            const cleanLocal = localPart.includes("+") ? localPart.split("+")[0] : localPart;
+
+            return `${cleanLocal}+${safeOrt}_${index}${domainPart}`;
+        }
+
+        function syncOrtFilterOptions(allRows) {
+            const filterSelect = document.getElementById("filterCodeOrt");
+            const currentValue = filterSelect.value;
+
+            const availableOrte = Array.from(
+                new Set(allRows.map(r => r.ort).filter(Boolean))
+            );
+
+            filterSelect.innerHTML = `<option value="__ALL__">Alle Orte</option>`;
+            availableOrte.forEach(ort => {
+                const opt = document.createElement("option");
+                opt.value = ort;
+                opt.textContent = ort;
+                filterSelect.appendChild(opt);
+            });
+
+            if (
+                currentValue === "__ALL__" ||
+                availableOrte.includes(currentValue)
+            ) {
+                filterSelect.value = currentValue;
+            } else {
+                filterSelect.value = "__ALL__";
+            }
+        }
+
+        function renderCodesTab() {
+            const codesResults = document.getElementById("codesResults");
+            const codesMeta = document.getElementById("codesMeta");
+            const codesBadge = document.getElementById("codesBadge");
+            const filterSelect = document.getElementById("filterCodeOrt");
+
+            const allRows = [];
+            entries.forEach(entry => {
+                const codes = extractTenCharCodes(entry.content);
+                const ort = detectOrtFromEmailOrEntry(entry.email, entry.ort);
+                codes.forEach(code => {
+                    allRows.push({
+                        index: entry.index,
+                        email: entry.email,
+                        ort,
+                        code
+                    });
+                });
+            });
+
+            syncOrtFilterOptions(allRows);
+            const selectedOrt = filterSelect.value;
+            const visibleRows =
+                selectedOrt === "__ALL__"
+                    ? allRows
+                    : allRows.filter(r => r.ort === selectedOrt);
+
+            codesBadge.textContent = String(allRows.length);
+            codesMeta.textContent =
+                selectedOrt === "__ALL__"
+                    ? `${allRows.length} ${allRows.length === 1 ? "Treffer" : "Treffer"}`
+                    : `${visibleRows.length} von ${allRows.length} Treffern`;
+
+            codesResults.innerHTML = "";
+            if (!visibleRows.length) {
+                codesResults.innerHTML = `
+                    <div class="result-item">
+                        <div class="result-content">${
+                            allRows.length
+                                ? "Keine Codes für den ausgewählten Ort gefunden."
+                                : "Noch keine 10-stelligen Codes extrahiert."
+                        }</div>
+                    </div>
+                `;
+                return;
+            }
+
+            visibleRows.forEach(row => {
+                const item = document.createElement("div");
+                item.className = "result-item";
+
+                const topRow = document.createElement("div");
+                topRow.className = "result-top";
+
+                const emailDiv = document.createElement("div");
+                emailDiv.className = "result-email";
+                emailDiv.textContent = `#${row.index} – ${row.email}`;
+
+                const ortBadge = document.createElement("span");
+                ortBadge.className = "ort-tag";
+                ortBadge.textContent = row.ort;
+
+                const codeRow = document.createElement("div");
+                codeRow.className = "code-row";
+
+                const pill = document.createElement("span");
+                pill.className = "code-pill";
+                pill.textContent = row.code;
+
+                const copyBtn = document.createElement("button");
+                copyBtn.type = "button";
+                copyBtn.className = "btn-copy";
+                copyBtn.textContent = "Kopieren";
+                copyBtn.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(row.code);
+                        copyBtn.textContent = "Kopiert!";
+                        setTimeout(() => {
+                            copyBtn.textContent = "Kopieren";
+                        }, 1500);
+                    } catch {
+                        copyBtn.textContent = "Fehler";
+                    }
+                });
+
+                topRow.appendChild(emailDiv);
+                topRow.appendChild(ortBadge);
+                codeRow.appendChild(pill);
+                codeRow.appendChild(copyBtn);
+                item.appendChild(topRow);
+                item.appendChild(codeRow);
+                codesResults.appendChild(item);
+            });
+        }
+
+        function renderEmailEntries() {
+            const emailResults = document.getElementById("emailResults");
+            emailResults.innerHTML = "";
+
+            if (!entries.length) {
+                emailResults.innerHTML = `
+                    <div class="result-item">
+                        <div class="result-content">Noch keine Durchläufe gesendet.</div>
+                    </div>
+                `;
+                renderCodesTab();
+                return;
+            }
+
+            entries.forEach(entry => {
+                const item = document.createElement("div");
+                item.className = "result-item";
+
+                const emailDiv = document.createElement("div");
+                emailDiv.className = "result-email";
+                emailDiv.textContent = `#${entry.index} – ${entry.email}`;
+
+                const contentDiv = document.createElement("div");
+                contentDiv.className = "result-content";
+                contentDiv.textContent = entry.content;
+
+                item.appendChild(emailDiv);
+                item.appendChild(contentDiv);
+                emailResults.appendChild(item);
+            });
+
+            renderCodesTab();
+        }
+
+        async function pollMessages() {
+            const targetEmails = entries.map(e => e.email.toLowerCase());
+            if (!targetEmails.length) return;
+
+            try {
+                const query = encodeURIComponent(targetEmails.join(","));
+                const res = await fetch(`${messagesUrl}?emails=${query}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                const results = data && data.results ? data.results : {};
+                let changed = false;
+
+                entries = entries.map(entry => {
+                    const hit = results[entry.email.toLowerCase()];
+                    if (hit && hit.content && entry.content !== hit.content) {
+                        changed = true;
+                        return {
+                            ...entry,
+                            content: hit.content
+                        };
+                    }
+                    return entry;
+                });
+
+                if (changed) {
+                    renderEmailEntries();
+                }
+
+                const allReceived = entries.every(
+                    e => !e.content.startsWith("Warte auf E-Mail-Inhalt")
+                );
+                if (allReceived && pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+            } catch {
+                // Beim nächsten Intervall erneut versuchen
+            }
+        }
+
+        function startPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+            }
+            pollMessages();
+            pollTimer = setInterval(pollMessages, 3000);
+        }
+
+        const etAnswer1 = document.getElementById("etAnswer1");
+        const etAnswer2 = document.getElementById("etAnswer2");
+        const etRepeatCount = document.getElementById("etRepeatCount");
+        const btnSend = document.getElementById("btnSend");
+        const tvStatus = document.getElementById("tvStatus");
+
+        updateCounterDisplay();
+        renderCodesTab();
+
+        btnSend.addEventListener("click", async () => {
+            const a1 = etAnswer1.value.trim();
+            const baseEmail = etAnswer2.value.trim() || DEFAULT_BASE_EMAIL;
+            const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
+            const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
+
+            etAnswer2.value = "";
+            btnSend.disabled = true;
+
+            let currentCounter = getSavedCounter();
+            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
+
+            const logs = [];
+
+            for (let i = 1; i <= repeatCount; i++) {
+                currentCounter += 1;
+                setSavedCounter(currentCounter);
+
+                const numberedEmail = buildLocationPlusEmail(baseEmail, a1, currentCounter);
+                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
+
+                const answersArray = [
+                    {
+                        questionId: "r9f72a3a2d06f43d999369da8cedd2bb4",
+                        answer1: a1
+                    },
+                    {
+                        questionId: "reb0fe8e35f5d4c0f987fb7277da2c530",
+                        answer1: numberedEmail
+                    }
+                ];
+
+                const bodyJson = JSON.stringify({
+                    startDate: defaultStartDate,
+                    submitDate: defaultSubmitDate,
+                    answers: JSON.stringify(answersArray)
+                });
+
+                try {
+                    const response = await fetch(endpointUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: bodyJson
+                    });
+
+                    if (response.ok) {
+                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${numberedEmail})`);
+                        entries.push({
+                            index: currentCounter,
+                            email: numberedEmail,
+                            ort: a1,
+                            content: "Warte auf E-Mail-Inhalt..."
+                        });
+                    } else {
+                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
+                        entries.push({
+                            index: currentCounter,
+                            email: numberedEmail,
+                            ort: a1,
+                            content: `Request fehlgeschlagen (HTTP ${response.status})`
+                        });
+                    }
+                } catch {
+                    logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
+                    entries.push({
+                        index: currentCounter,
+                        email: numberedEmail,
+                        ort: a1,
+                        content: "Netzwerk-/Request-Fehler"
+                    });
+                }
+
+                renderEmailEntries();
+            }
+
+            tvStatus.textContent = logs.join("\n");
+            btnSend.disabled = false;
+            startPolling();
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diggi Forms Sender</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: #F3F5F7;
+            color: #1E293B;
+            padding: 16px 16px 88px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 540px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .field-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 4px;
+            display: block;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        select {
+            width: 100%;
+            height: 46px;
+            padding: 0 12px;
+            font-size: 15px;
+            color: #1E293B;
+            background-color: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        select {
+            cursor: pointer;
+        }
+        input:focus,
+        select:focus {
+            border-color: #F97316;
+        }
+        input::placeholder {
+            color: #94A3B8;
+        }
+        .btn-primary {
+            width: 100%;
+            height: 52px;
+            background-color: #F97316;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, opacity 0.15s ease;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #EA580C;
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .status-card {
+            background-color: #1E293B;
+            color: #E2E8F0;
+            border-radius: 14px;
+            padding: 14px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .results-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+        .results-meta {
+            font-size: 12px;
+            color: #64748B;
+        }
         .results-list {
             display: flex;
             flex-direction: column;
