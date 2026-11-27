@@ -510,9 +510,14 @@
 
         function setLocalAction(email, code, type) {
             const key = getActionKey(email, code);
-            const current = actionsMap.get(key) || { added: false, copied: false };
-            if (type === "added") current.added = true;
-            if (type === "copied") current.copied = true;
+            const current = actionsMap.get(key) || { added: false, copied: false, hidden: false };
+            if (type === "added") {
+                current.added = true;
+                current.hidden = true;
+            }
+            if (type === "copied") {
+                current.copied = true;
+            }
             actionsMap.set(key, current);
             renderCodesTab();
         }
@@ -694,8 +699,10 @@
                 codes.forEach(code => {
                     const act = actionsMap.get(getActionKey(entry.email, code)) || {
                         added: false,
-                        copied: false
+                        copied: false,
+                        hidden: false
                     };
+                    if (act.hidden || act.added) return;
                     allRows.push({
                         index: entry.index,
                         email: entry.email,
@@ -727,7 +734,7 @@
                         <div class="result-content">${
                             allRows.length
                                 ? "Keine Codes für den ausgewählten Ort gefunden."
-                                : "Noch keine 10-stelligen Codes extrahiert."
+                                : "Keine offenen 10-stelligen Codes mehr vorhanden."
                         }</div>
                     </div>
                 `;
@@ -765,9 +772,6 @@
                 addLink.target = "_blank";
                 addLink.rel = "noopener noreferrer";
                 addLink.appendChild(document.createTextNode("Hinzufügen"));
-                if (row.added) {
-                    addLink.appendChild(createGreenCheck());
-                }
                 addLink.addEventListener("click", () => {
                     recordActionRealtime(row.email, row.code, "added");
                 });
@@ -875,10 +879,14 @@
                 const nextActionsMap = new Map(actionsMap);
                 Object.entries(serverActions).forEach(([mapKey, act]) => {
                     const normalizedKey = mapKey.toLowerCase();
-                    const prev = nextActionsMap.get(normalizedKey) || { added: false, copied: false };
+                    const prev = nextActionsMap.get(normalizedKey) || { added: false, copied: false, hidden: false };
+                    const isAdded = Boolean(prev.added || (act && act.added));
+                    const isCopied = Boolean(prev.copied || (act && act.copied));
+                    const isHidden = Boolean(prev.hidden || (act && act.hidden) || isAdded);
                     nextActionsMap.set(normalizedKey, {
-                        added: Boolean(prev.added || (act && act.added)),
-                        copied: Boolean(prev.copied || (act && act.copied))
+                        added: isAdded,
+                        copied: isCopied,
+                        hidden: isHidden
                     });
                 });
 
