@@ -342,7 +342,6 @@
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
         const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
-        const ENTRIES_STORAGE_KEY = "diggi_saved_entries_v1";
         const DEFAULT_BASE_EMAIL = "wernermichael2222@gmail.com";
 
         const maerkte = [
@@ -459,26 +458,7 @@
             selectOrt.appendChild(option);
         });
 
-        function loadSavedEntries() {
-            try {
-                const raw = localStorage.getItem(ENTRIES_STORAGE_KEY);
-                if (!raw) return [];
-                const parsed = JSON.parse(raw);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch {
-                return [];
-            }
-        }
-
-        function saveEntries() {
-            try {
-                localStorage.setItem(ENTRIES_STORAGE_KEY, JSON.stringify(entries));
-            } catch {
-                // Speicherlimit ignorieren
-            }
-        }
-
-        let entries = loadSavedEntries();
+        let entries = [];
         let pollTimer = null;
 
         function switchBottomTab(tabName) {
@@ -514,6 +494,12 @@
             }
 
             return found;
+        }
+
+        function extractIndexFromEmail(email) {
+            const localPart = (email || "").split("@")[0] || "";
+            const match = localPart.match(/_(\d+)$/);
+            return match ? parseInt(match[1], 10) : 0;
         }
 
         function detectOrtFromEmailOrEntry(email, fallbackOrt) {
@@ -662,7 +648,7 @@
 
                 const emailDiv = document.createElement("div");
                 emailDiv.className = "result-email";
-                emailDiv.textContent = `#${row.index} – ${row.email}`;
+                emailDiv.textContent = row.index ? `#${row.index} – ${row.email}` : row.email;
 
                 const ortBadge = document.createElement("span");
                 ortBadge.className = "ort-tag";
@@ -721,7 +707,7 @@
 
                 const emailDiv = document.createElement("div");
                 emailDiv.className = "result-email";
-                emailDiv.textContent = `#${entry.index} – ${entry.email}`;
+                emailDiv.textContent = entry.index ? `#${entry.index} – ${entry.email}` : entry.email;
 
                 const contentDiv = document.createElement("div");
                 contentDiv.className = "result-content";
@@ -736,41 +722,45 @@
         }
 
         async function pollMessages() {
-            const targetEmails = entries.map(e => e.email.toLowerCase());
-            if (!targetEmails.length) return;
-
             try {
-                const query = encodeURIComponent(targetEmails.join(","));
-                const res = await fetch(`${messagesUrl}?emails=${query}`);
+                const res = await fetch(messagesUrl);
                 if (!res.ok) return;
 
                 const data = await res.json();
                 const results = data && data.results ? data.results : {};
-                let changed = false;
+                const byEmail = new Map();
 
-                entries = entries.map(entry => {
-                    const hit = results[entry.email.toLowerCase()];
-                    if (hit && hit.content && entry.content !== hit.content) {
-                        changed = true;
-                        return {
-                            ...entry,
-                            content: hit.content
-                        };
-                    }
-                    return entry;
+                entries.forEach(entry => {
+                    byEmail.set(entry.email.toLowerCase(), entry);
                 });
 
-                if (changed) {
-                    saveEntries();
-                    renderEmailEntries();
-                }
+                Object.entries(results).forEach(([emailKey, hit]) => {
+                    const lowerEmail = emailKey.toLowerCase();
+                    const content = hit && hit.content ? hit.content : "";
+                    if (!content) return;
 
-                const allReceived = entries.every(
-                    e => !e.content.startsWith("Warte auf E-Mail-Inhalt")
-                );
-                if (allReceived && pollTimer) {
-                    clearInterval(pollTimer);
-                    pollTimer = null;
+                    const existing = byEmail.get(lowerEmail);
+                    if (existing) {
+                        byEmail.set(lowerEmail, {
+                            ...existing,
+                            content
+                        });
+                    } else {
+                        byEmail.set(lowerEmail, {
+                            index: extractIndexFromEmail(lowerEmail),
+                            email: lowerEmail,
+                            ort: detectOrtFromEmailOrEntry(lowerEmail, "Unbekannt"),
+                            content
+                        });
+                    }
+                });
+
+                const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
+                const changed = JSON.stringify(merged) !== JSON.stringify(entries);
+
+                if (changed) {
+                    entries = merged;
+                    renderEmailEntries();
                 }
             } catch {
                 // Beim nächsten Intervall erneut versuchen
@@ -782,7 +772,7 @@
                 clearInterval(pollTimer);
             }
             pollMessages();
-            pollTimer = setInterval(pollMessages, 3000);
+            pollTimer = setInterval(pollMessages, 5000);
         }
 
         const etAnswer1 = document.getElementById("etAnswer1");
@@ -793,9 +783,7 @@
 
         updateCounterDisplay();
         renderEmailEntries();
-        if (entries.some(e => e.content.startsWith("Warte auf E-Mail-Inhalt"))) {
-            startPolling();
-        }
+        startPolling();
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
@@ -872,7 +860,6 @@
                     });
                 }
 
-                saveEntries();
                 renderEmailEntries();
             }
 
