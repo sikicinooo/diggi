@@ -98,22 +98,6 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
-        .btn-secondary {
-            width: 100%;
-            height: 44px;
-            margin-top: 8px;
-            background-color: #0F172A;
-            color: #FFFFFF;
-            font-size: 14px;
-            font-weight: 700;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-        .btn-secondary:hover {
-            background-color: #334155;
-        }
         .status-card {
             background-color: #1E293B;
             color: #E2E8F0;
@@ -316,11 +300,6 @@
             background-color: #F97316;
             color: #FFFFFF;
         }
-        .stack-gap {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
     </style>
 </head>
 <body>
@@ -335,7 +314,7 @@
             <!-- 2. Titel: E-Mail -->
             <div class="card">
                 <label for="etAnswer2" class="card-title">E-Mail</label>
-                <input type="email" id="etAnswer2" value="" placeholder="Beliebige E-Mail oder Basis-E-Mail (Standard: wernermichael2222@gmail.com)" autocomplete="off">
+                <input type="email" id="etAnswer2" value="" placeholder="Beliebige E-Mail (optional, Standard: wernermichael2222@gmail.com)" autocomplete="off">
             </div>
 
             <!-- Durchläufe -->
@@ -346,22 +325,6 @@
 
             <!-- Senden-Button -->
             <button id="btnSend" class="btn-primary" type="button">Absenden</button>
-
-            <!-- Direkter zentraler Code-Eintrag für beliebige E-Mail -->
-            <div class="card">
-                <span class="card-title">Code zentral speichern</span>
-                <div class="stack-gap">
-                    <div>
-                        <label for="manualEmail" class="field-label">Beliebige E-Mail-Adresse</label>
-                        <input type="email" id="manualEmail" placeholder="z. B. kunde@beispiel.de" autocomplete="off">
-                    </div>
-                    <div>
-                        <label for="manualCode" class="field-label">Code (10-stellig)</label>
-                        <input type="text" id="manualCode" placeholder="z. B. AB12CD34EF" maxlength="20" autocomplete="off">
-                    </div>
-                </div>
-                <button id="btnSaveManualCode" class="btn-secondary" type="button">Code zentral speichern</button>
-            </div>
 
             <!-- Status-Log -->
             <div id="tvStatus" class="status-card">Bereit.</div>
@@ -418,7 +381,6 @@
         const endpointUrl = `${workerBaseUrl}/`;
         const messagesUrl = `${workerBaseUrl}/messages`;
         const actionUrl = `${workerBaseUrl}/action`;
-        const manualCodeUrl = `${workerBaseUrl}/manual-code`;
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
         const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
@@ -641,7 +603,7 @@
         }
 
         function detectOrtFromEmailOrEntry(email, fallbackOrt) {
-            if (fallbackOrt) return fallbackOrt;
+            if (fallbackOrt && fallbackOrt !== "Unbekannt") return fallbackOrt;
             const localPart = (email || "").split("@")[0] || "";
             const plusMatch = localPart.match(/\+([^@]+)$/);
             if (plusMatch) {
@@ -693,7 +655,7 @@
             return normalized || "Ort";
         }
 
-        function buildLocationPlusEmail(email, ortValue, index, repeatCount) {
+        function buildTargetEmail(email, ortValue, index, repeatCount) {
             const trimmed = (email || "").trim();
             if (
                 trimmed &&
@@ -936,24 +898,22 @@
 
                 const data = await res.json();
                 const results = data && data.results ? data.results : {};
-                const byKey = new Map();
+                const byEmail = new Map();
 
-                entries.forEach((entry, idx) => {
-                    const key = entry.key || `${entry.email.toLowerCase()}#${idx}`;
-                    byKey.set(key, entry);
+                entries.forEach(entry => {
+                    byEmail.set(entry.email.toLowerCase(), entry);
                 });
 
                 Object.entries(results).forEach(([resultKey, hit]) => {
                     const email = ((hit && hit.to) || resultKey.split(" (")[0] || "").trim().toLowerCase();
                     const content = hit && hit.content ? hit.content : "";
-                    const ort = (hit && hit.ort) || detectOrtFromEmailOrEntry(email, "");
                     if (!email || !content) return;
 
-                    byKey.set(resultKey, {
-                        key: resultKey,
-                        index: extractIndexFromEmail(email),
+                    const existing = byEmail.get(email);
+                    byEmail.set(email, {
+                        index: existing ? existing.index : extractIndexFromEmail(email),
                         email,
-                        ort,
+                        ort: (hit && hit.ort) || (existing && existing.ort) || detectOrtFromEmailOrEntry(email, "Unbekannt"),
                         content
                     });
                 });
@@ -962,7 +922,7 @@
                     applyServerState(data.state);
                 }
 
-                const merged = Array.from(byKey.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
+                const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
                 if (JSON.stringify(merged) !== JSON.stringify(entries)) {
                     entries = merged;
                     renderEmailEntries();
@@ -975,9 +935,6 @@
         const etAnswer1 = document.getElementById("etAnswer1");
         const etAnswer2 = document.getElementById("etAnswer2");
         const etRepeatCount = document.getElementById("etRepeatCount");
-        const manualEmail = document.getElementById("manualEmail");
-        const manualCode = document.getElementById("manualCode");
-        const btnSaveManualCode = document.getElementById("btnSaveManualCode");
         const btnSend = document.getElementById("btnSend");
         const tvStatus = document.getElementById("tvStatus");
 
@@ -986,48 +943,9 @@
         loadInitialMessages();
         startPolling();
 
-        btnSaveManualCode.addEventListener("click", async () => {
-            const emailVal = manualEmail.value.trim().toLowerCase();
-            const codeVal = manualCode.value.trim().toUpperCase();
-            const ortVal = etAnswer1.value.trim();
-
-            if (!emailVal || !codeVal) {
-                tvStatus.textContent = "Bitte E-Mail-Adresse und Code angeben.";
-                return;
-            }
-
-            btnSaveManualCode.disabled = true;
-            try {
-                const res = await fetch(manualCodeUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({
-                        email: emailVal,
-                        code: codeVal,
-                        ort: ortVal
-                    })
-                });
-                const json = await res.json();
-                if (res.ok && json.ok) {
-                    tvStatus.textContent = `Code ${codeVal} für ${emailVal} zentral gespeichert.`;
-                    manualCode.value = "";
-                    await loadInitialMessages();
-                } else {
-                    tvStatus.textContent = `Fehler beim Speichern: ${json.error || res.status}`;
-                }
-            } catch {
-                tvStatus.textContent = "Netzwerkfehler beim zentralen Speichern.";
-            } finally {
-                btnSaveManualCode.disabled = false;
-            }
-        });
-
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
-            const baseEmail = etAnswer2.value.trim() || DEFAULT_BASE_EMAIL;
+            const rawInputEmail = etAnswer2.value.trim();
             const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
             const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
 
@@ -1035,16 +953,23 @@
             btnSend.disabled = true;
 
             let currentCounter = getSavedCounter();
-            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
+            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe...`;
 
             const logs = [];
 
             for (let i = 1; i <= repeatCount; i++) {
-                currentCounter += 1;
-                setSavedCounter(currentCounter);
+                const isCustomSingle =
+                    Boolean(rawInputEmail) &&
+                    rawInputEmail.toLowerCase() !== DEFAULT_BASE_EMAIL &&
+                    repeatCount === 1;
 
-                const numberedEmail = buildLocationPlusEmail(baseEmail, a1, currentCounter, repeatCount);
-                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
+                if (!isCustomSingle) {
+                    currentCounter += 1;
+                    setSavedCounter(currentCounter);
+                }
+
+                const targetEmail = buildTargetEmail(rawInputEmail, a1, currentCounter, repeatCount);
+                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${targetEmail}...`].join("\n");
 
                 const answersArray = [
                     {
@@ -1053,7 +978,7 @@
                     },
                     {
                         questionId: "reb0fe8e35f5d4c0f987fb7277da2c530",
-                        answer1: numberedEmail
+                        answer1: targetEmail
                     }
                 ];
 
@@ -1074,30 +999,27 @@
                     });
 
                     if (response.ok) {
-                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${numberedEmail})`);
+                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${targetEmail})`);
                         entries.push({
-                            key: `${numberedEmail}#${currentCounter}`,
-                            index: currentCounter,
-                            email: numberedEmail,
+                            index: isCustomSingle ? 0 : currentCounter,
+                            email: targetEmail,
                             ort: a1,
                             content: "Warte auf E-Mail-Inhalt..."
                         });
                     } else {
-                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
+                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${targetEmail}`);
                         entries.push({
-                            key: `${numberedEmail}#${currentCounter}`,
-                            index: currentCounter,
-                            email: numberedEmail,
+                            index: isCustomSingle ? 0 : currentCounter,
+                            email: targetEmail,
                             ort: a1,
                             content: `Request fehlgeschlagen (HTTP ${response.status})`
                         });
                     }
                 } catch {
-                    logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
+                    logs.push(`[${i}/${repeatCount}] Fehler – ${targetEmail}`);
                     entries.push({
-                        key: `${numberedEmail}#${currentCounter}`,
-                        index: currentCounter,
-                        email: numberedEmail,
+                        index: isCustomSingle ? 0 : currentCounter,
+                        email: targetEmail,
                         ort: a1,
                         content: "Netzwerk-/Request-Fehler"
                     });
