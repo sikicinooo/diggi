@@ -342,6 +342,7 @@
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
         const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
+        const ENTRIES_STORAGE_KEY = "diggi_saved_entries_v1";
         const DEFAULT_BASE_EMAIL = "wernermichael2222@gmail.com";
 
         const maerkte = [
@@ -458,7 +459,26 @@
             selectOrt.appendChild(option);
         });
 
-        let entries = [];
+        function loadSavedEntries() {
+            try {
+                const raw = localStorage.getItem(ENTRIES_STORAGE_KEY);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function saveEntries() {
+            try {
+                localStorage.setItem(ENTRIES_STORAGE_KEY, JSON.stringify(entries));
+            } catch {
+                // Speicherlimit ignorieren
+            }
+        }
+
+        let entries = loadSavedEntries();
         let pollTimer = null;
 
         function switchBottomTab(tabName) {
@@ -741,6 +761,7 @@
                 });
 
                 if (changed) {
+                    saveEntries();
                     renderEmailEntries();
                 }
 
@@ -771,7 +792,10 @@
         const tvStatus = document.getElementById("tvStatus");
 
         updateCounterDisplay();
-        renderCodesTab();
+        renderEmailEntries();
+        if (entries.some(e => e.content.startsWith("Warte auf E-Mail-Inhalt"))) {
+            startPolling();
+        }
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
@@ -848,6 +872,7 @@
                     });
                 }
 
+                saveEntries();
                 renderEmailEntries();
             }
 
