@@ -171,6 +171,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
             gap: 8px;
             margin-top: 6px;
         }
@@ -186,6 +187,28 @@
             padding: 5px 12px;
             border-radius: 8px;
             word-break: break-all;
+        }
+        .code-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .btn-add {
+            display: inline-block;
+            text-decoration: none;
+            background-color: #F97316;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .btn-add:hover {
+            background-color: #EA580C;
         }
         .btn-copy {
             background-color: #0F172A;
@@ -461,6 +484,10 @@
         let entries = [];
         let pollTimer = null;
 
+        function buildPromotionCodeUrl(code) {
+            return `https://edeka.go.link/main/promotioncodes?promotionCode=${encodeURIComponent(code)}&adj_t=20di8uy6&adj_campaign=Gewinne`;
+        }
+
         function switchBottomTab(tabName) {
             const isCodes = tabName === "codes";
             document.body.classList.toggle("codes-only", isCodes);
@@ -661,6 +688,16 @@
                 pill.className = "code-pill";
                 pill.textContent = row.code;
 
+                const actions = document.createElement("div");
+                actions.className = "code-actions";
+
+                const addLink = document.createElement("a");
+                addLink.className = "btn-add";
+                addLink.href = buildPromotionCodeUrl(row.code);
+                addLink.target = "_blank";
+                addLink.rel = "noopener noreferrer";
+                addLink.textContent = "Hinzufügen";
+
                 const copyBtn = document.createElement("button");
                 copyBtn.type = "button";
                 copyBtn.className = "btn-copy";
@@ -677,10 +714,13 @@
                     }
                 });
 
+                actions.appendChild(addLink);
+                actions.appendChild(copyBtn);
+
                 topRow.appendChild(emailDiv);
                 topRow.appendChild(ortBadge);
                 codeRow.appendChild(pill);
-                codeRow.appendChild(copyBtn);
+                codeRow.appendChild(actions);
                 item.appendChild(topRow);
                 item.appendChild(codeRow);
                 codesResults.appendChild(item);
