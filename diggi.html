@@ -195,9 +195,7 @@
             flex-shrink: 0;
         }
         .btn-add {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
+            display: inline-block;
             text-decoration: none;
             background-color: #F97316;
             color: #FFFFFF;
@@ -213,9 +211,6 @@
             background-color: #EA580C;
         }
         .btn-copy {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
             background-color: #0F172A;
             color: #FFFFFF;
             border: none;
@@ -228,19 +223,6 @@
         }
         .btn-copy:hover {
             background-color: #334155;
-        }
-        .check-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 16px;
-            height: 16px;
-            border-radius: 999px;
-            background-color: #16A34A;
-            color: #FFFFFF;
-            font-size: 11px;
-            font-weight: 800;
-            line-height: 1;
         }
         .tab-panel {
             display: none;
@@ -380,7 +362,6 @@
         const workerBaseUrl = "https://diggi-proxy.sikicinooo.workers.dev";
         const endpointUrl = `${workerBaseUrl}/`;
         const messagesUrl = `${workerBaseUrl}/messages`;
-        const actionUrl = `${workerBaseUrl}/action`;
         const defaultStartDate = "2026-11-24T11:22:28.136Z";
         const defaultSubmitDate = "2026-11-24T14:58:03.704Z";
         const COUNTER_STORAGE_KEY = "diggi_email_counter_v1";
@@ -501,42 +482,7 @@
         });
 
         let entries = [];
-        let actionsMap = new Map();
         let pollTimer = null;
-
-        function getActionKey(email, code) {
-            return `${(email || "").trim().toLowerCase()}::${(code || "").trim().toUpperCase()}`;
-        }
-
-        function setLocalAction(email, code, type) {
-            const key = getActionKey(email, code);
-            const current = actionsMap.get(key) || { added: false, copied: false };
-            if (type === "added") current.added = true;
-            if (type === "copied") current.copied = true;
-            actionsMap.set(key, current);
-            renderCodesTab();
-        }
-
-        async function recordActionRealtime(email, code, type) {
-            setLocalAction(email, code, type);
-            try {
-                await fetch(actionUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({
-                        email: (email || "").toLowerCase(),
-                        code: (code || "").toUpperCase(),
-                        action: type
-                    })
-                });
-                await pollMessages();
-            } catch {
-                // Beim nächsten Polling erneut synchronisieren
-            }
-        }
 
         function buildPromotionCodeUrl(code) {
             return `https://edeka.go.link/main/promotioncodes?promotionCode=${encodeURIComponent(code)}&adj_t=20di8uy6&adj_campaign=Gewinne`;
@@ -673,13 +619,6 @@
             }
         }
 
-        function createGreenCheck() {
-            const span = document.createElement("span");
-            span.className = "check-badge";
-            span.textContent = "✓";
-            return span;
-        }
-
         function renderCodesTab() {
             const codesResults = document.getElementById("codesResults");
             const codesMeta = document.getElementById("codesMeta");
@@ -691,17 +630,11 @@
                 const codes = extractTenCharCodes(entry.content);
                 const ort = detectOrtFromEmailOrEntry(entry.email, entry.ort);
                 codes.forEach(code => {
-                    const act = actionsMap.get(getActionKey(entry.email, code)) || {
-                        added: false,
-                        copied: false
-                    };
                     allRows.push({
                         index: entry.index,
                         email: entry.email,
                         ort,
-                        code,
-                        added: Boolean(act.added),
-                        copied: Boolean(act.copied)
+                        code
                     });
                 });
             });
@@ -763,28 +696,22 @@
                 addLink.href = buildPromotionCodeUrl(row.code);
                 addLink.target = "_blank";
                 addLink.rel = "noopener noreferrer";
-                addLink.appendChild(document.createTextNode("Hinzufügen"));
-                if (row.added) {
-                    addLink.appendChild(createGreenCheck());
-                }
-                addLink.addEventListener("click", () => {
-                    recordActionRealtime(row.email, row.code, "added");
-                });
+                addLink.textContent = "Hinzufügen";
 
                 const copyBtn = document.createElement("button");
                 copyBtn.type = "button";
                 copyBtn.className = "btn-copy";
-                copyBtn.appendChild(document.createTextNode("Kopieren"));
-                if (row.copied) {
-                    copyBtn.appendChild(createGreenCheck());
-                }
+                copyBtn.textContent = "Kopieren";
                 copyBtn.addEventListener("click", async () => {
                     try {
                         await navigator.clipboard.writeText(row.code);
+                        copyBtn.textContent = "Kopiert!";
+                        setTimeout(() => {
+                            copyBtn.textContent = "Kopieren";
+                        }, 1500);
                     } catch {
-                        // Fallback für eingeschränkte Browser-Kontexte
+                        copyBtn.textContent = "Fehler";
                     }
-                    recordActionRealtime(row.email, row.code, "copied");
                 });
 
                 actions.appendChild(addLink);
@@ -841,7 +768,6 @@
 
                 const data = await res.json();
                 const results = data && data.results ? data.results : {};
-                const serverActions = data && data.actions ? data.actions : {};
                 const byEmail = new Map();
 
                 entries.forEach(entry => {
@@ -869,31 +795,12 @@
                     }
                 });
 
-                const nextActionsMap = new Map(actionsMap);
-                Object.entries(serverActions).forEach(([mapKey, act]) => {
-                    const normalizedKey = mapKey.toLowerCase();
-                    const prev = nextActionsMap.get(normalizedKey) || { added: false, copied: false };
-                    nextActionsMap.set(normalizedKey, {
-                        added: Boolean(prev.added || (act && act.added)),
-                        copied: Boolean(prev.copied || (act && act.copied))
-                    });
-                });
-
                 const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
-                const entriesChanged = JSON.stringify(merged) !== JSON.stringify(entries);
-                const actionsChanged =
-                    JSON.stringify(Array.from(nextActionsMap.entries()).sort()) !==
-                    JSON.stringify(Array.from(actionsMap.entries()).sort());
+                const changed = JSON.stringify(merged) !== JSON.stringify(entries);
 
-                if (actionsChanged) {
-                    actionsMap = nextActionsMap;
-                }
-
-                if (entriesChanged) {
+                if (changed) {
                     entries = merged;
                     renderEmailEntries();
-                } else if (actionsChanged) {
-                    renderCodesTab();
                 }
             } catch {
                 // Beim nächsten Intervall erneut versuchen
@@ -905,7 +812,7 @@
                 clearInterval(pollTimer);
             }
             pollMessages();
-            pollTimer = setInterval(pollMessages, 2500);
+            pollTimer = setInterval(pollMessages, 5000);
         }
 
         const etAnswer1 = document.getElementById("etAnswer1");
