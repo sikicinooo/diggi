@@ -501,46 +501,45 @@
         });
 
         let entries = [];
-        let actionsMap = new Map();
+        let hiddenCodesSet = new Set();
+        let copiedCodesSet = new Set();
         let pollTimer = null;
 
-        function getActionKey(email, code) {
-            return `${(email || "").trim().toLowerCase()}::${(code || "").trim().toUpperCase()}`;
-        }
+        async function recordActionRealtime(email, code, type) {
+            const upperCode = (code || "").trim().toUpperCase();
+            if (!upperCode) return;
 
-        function setLocalAction(email, code, type) {
-            const key = getActionKey(email, code);
-            const current = actionsMap.get(key) || { added: false, copied: false, hidden: false };
             if (type === "added") {
-                current.added = true;
-                current.hidden = true;
+                hiddenCodesSet.add(upperCode);
             }
             if (type === "copied") {
-                current.copied = true;
+                copiedCodesSet.add(upperCode);
             }
-            actionsMap.set(key, current);
             renderCodesTab();
-        }
 
-        async function recordActionRealtime(email, code, type) {
-            setLocalAction(email, code, type);
+            const payload = JSON.stringify({
+                email: (email || "").toLowerCase(),
+                code: upperCode,
+                action: type
+            });
+
             try {
                 await fetch(actionUrl, {
                     method: "POST",
+                    keepalive: true,
                     cache: "no-store",
                     headers: {
                         "Content-Type": "application/json",
                         "Accept": "application/json"
                     },
-                    body: JSON.stringify({
-                        email: (email || "").toLowerCase(),
-                        code: (code || "").toUpperCase(),
-                        action: type
-                    })
+                    body: payload
                 });
                 await pollMessages();
             } catch {
-                // Beim nächsten Polling erneut synchronisieren
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([payload], { type: "text/plain;charset=UTF-8" });
+                    navigator.sendBeacon(actionUrl, blob);
+                }
             }
         }
 
@@ -560,6 +559,11 @@
         document.getElementById("tabBtnEmails").addEventListener("click", () => switchBottomTab("emails"));
         document.getElementById("tabBtnCodes").addEventListener("click", () => switchBottomTab("codes"));
         document.getElementById("filterCodeOrt").addEventListener("change", () => renderCodesTab());
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                pollMessages();
+            }
+        });
 
         function extractTenCharCodes(text) {
             if (!text || text.startsWith("Warte auf E-Mail-Inhalt")) return [];
@@ -697,19 +701,14 @@
                 const codes = extractTenCharCodes(entry.content);
                 const ort = detectOrtFromEmailOrEntry(entry.email, entry.ort);
                 codes.forEach(code => {
-                    const act = actionsMap.get(getActionKey(entry.email, code)) || {
-                        added: false,
-                        copied: false,
-                        hidden: false
-                    };
-                    if (act.hidden || act.added) return;
+                    const upperCode = code.toUpperCase();
+                    if (hiddenCodesSet.has(upperCode)) return;
                     allRows.push({
                         index: entry.index,
                         email: entry.email,
                         ort,
-                        code,
-                        added: Boolean(act.added),
-                        copied: Boolean(act.copied)
+                        code: upperCode,
+                        copied: copiedCodesSet.has(upperCode)
                     });
                 });
             });
@@ -734,7 +733,7 @@
                         <div class="result-content">${
                             allRows.length
                                 ? "Keine Codes für den ausgewählten Ort gefunden."
-                                : "Keine offenen 10-stelligen Codes mehr vorhanden."
+                                : "Keine offenen 10-stelligen Codes vorhanden."
                         }</div>
                     </div>
                 `;
@@ -772,6 +771,9 @@
                 addLink.target = "_blank";
                 addLink.rel = "noopener noreferrer";
                 addLink.appendChild(document.createTextNode("Hinzufügen"));
+                addLink.addEventListener("pointerdown", () => {
+                    recordActionRealtime(row.email, row.code, "added");
+                });
                 addLink.addEventListener("click", () => {
                     recordActionRealtime(row.email, row.code, "added");
                 });
@@ -848,7 +850,7 @@
 
                 const data = await res.json();
                 const results = data && data.results ? data.results : {};
-                const serverActions = data && data.actions ? data.actions : {};
+                const serverState = data && data.state ? data.state : {};
                 const byEmail = new Map();
 
                 entries.forEach(entry => {
@@ -876,34 +878,33 @@
                     }
                 });
 
-                const nextActionsMap = new Map(actionsMap);
-                Object.entries(serverActions).forEach(([mapKey, act]) => {
-                    const normalizedKey = mapKey.toLowerCase();
-                    const prev = nextActionsMap.get(normalizedKey) || { added: false, copied: false, hidden: false };
-                    const isAdded = Boolean(prev.added || (act && act.added));
-                    const isCopied = Boolean(prev.copied || (act && act.copied));
-                    const isHidden = Boolean(prev.hidden || (act && act.hidden) || isAdded);
-                    nextActionsMap.set(normalizedKey, {
-                        added: isAdded,
-                        copied: isCopied,
-                        hidden: isHidden
+                const nextHidden = new Set(hiddenCodesSet);
+                if (Array.isArray(serverState.hiddenCodes)) {
+                    serverState.hiddenCodes.forEach(c => {
+                        if (c) nextHidden.add(String(c).toUpperCase());
                     });
-                });
+                }
+
+                const nextCopied = new Set(copiedCodesSet);
+                if (Array.isArray(serverState.copiedCodes)) {
+                    serverState.copiedCodes.forEach(c => {
+                        if (c) nextCopied.add(String(c).toUpperCase());
+                    });
+                }
+
+                const hiddenChanged = nextHidden.size !== hiddenCodesSet.size;
+                const copiedChanged = nextCopied.size !== copiedCodesSet.size;
+
+                if (hiddenChanged) hiddenCodesSet = nextHidden;
+                if (copiedChanged) copiedCodesSet = nextCopied;
 
                 const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
                 const entriesChanged = JSON.stringify(merged) !== JSON.stringify(entries);
-                const actionsChanged =
-                    JSON.stringify(Array.from(nextActionsMap.entries()).sort()) !==
-                    JSON.stringify(Array.from(actionsMap.entries()).sort());
-
-                if (actionsChanged) {
-                    actionsMap = nextActionsMap;
-                }
 
                 if (entriesChanged) {
                     entries = merged;
                     renderEmailEntries();
-                } else if (actionsChanged) {
+                } else if (hiddenChanged || copiedChanged) {
                     renderCodesTab();
                 }
             } catch {
@@ -916,7 +917,7 @@
                 clearInterval(pollTimer);
             }
             pollMessages();
-            pollTimer = setInterval(pollMessages, 5000);
+            pollTimer = setInterval(pollMessages, 3000);
         }
 
         const etAnswer1 = document.getElementById("etAnswer1");
