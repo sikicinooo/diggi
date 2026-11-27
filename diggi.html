@@ -503,7 +503,7 @@
         let entries = [];
         let hiddenCodesSet = new Set();
         let copiedCodesSet = new Set();
-let pollTimer = null;
+        let pollTimer = null;
 
         function startPolling() {
             if (pollTimer) clearInterval(pollTimer);
@@ -531,20 +531,6 @@ let pollTimer = null;
                 code: upperCode,
                 action: type
             });
-
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                try {
-                    socket.send(JSON.stringify({
-                        type: "ACTION",
-                        email: (email || "").toLowerCase(),
-                        code: upperCode,
-                        action: type
-                    }));
-                    return;
-                } catch {
-                    // Fallback über HTTP POST unten
-                }
-            }
 
             try {
                 await fetch(actionUrl, {
@@ -584,9 +570,7 @@ let pollTimer = null;
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
                 loadInitialMessages();
-                if (!socket || socket.readyState !== WebSocket.OPEN) {
-                    connectWebSocket();
-                }
+                startPolling();
             }
         });
 
@@ -940,47 +924,8 @@ let pollTimer = null;
                     renderEmailEntries();
                 }
             } catch {
-                // Beim nächsten Reconnect erneut versuchen
+                // Beim nächsten Intervall erneut versuchen
             }
-        }
-
-        function connectWebSocket() {
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = null;
-            }
-            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-                return;
-            }
-
-            const wsUrl = workerBaseUrl.replace(/^http/, "ws") + "/ws";
-            socket = new WebSocket(wsUrl);
-
-            socket.onmessage = (event) => {
-                try {
-                    const msg = JSON.parse(event.data);
-                    if (msg.state) {
-                        applyServerState(msg.state);
-                    }
-                    if (msg.type === "UPDATE" && msg.action === "new_mail") {
-                        loadInitialMessages();
-                    }
-                } catch {
-                    // Ungültige Nachricht ignorieren
-                }
-            };
-
-            socket.onclose = () => {
-                reconnectTimer = setTimeout(connectWebSocket, 2000);
-            };
-
-            socket.onerror = () => {
-                try {
-                    socket.close();
-                } catch {
-                    // Ignorieren
-                }
-            };
         }
 
         const etAnswer1 = document.getElementById("etAnswer1");
@@ -992,7 +937,7 @@ let pollTimer = null;
         updateCounterDisplay();
         renderEmailEntries();
         loadInitialMessages();
-        connectWebSocket();
+        startPolling();
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
@@ -1075,7 +1020,7 @@ let pollTimer = null;
             tvStatus.textContent = logs.join("\n");
             btnSend.disabled = false;
             loadInitialMessages();
-            connectWebSocket();
+            startPolling();
         });
     </script>
 </body>
