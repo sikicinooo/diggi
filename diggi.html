@@ -503,7 +503,8 @@
         let entries = [];
         let hiddenCodesSet = new Set();
         let copiedCodesSet = new Set();
-        let pollTimer = null;
+        let socket = null;
+        let reconnectTimer = null;
 
         async function recordActionRealtime(email, code, type) {
             const upperCode = (code || "").trim().toUpperCase();
@@ -523,6 +524,19 @@
                 action: type
             });
 
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                try {
+                    socket.send(JSON.stringify({
+                        type: "ACTION",
+                        email: (email || "").toLowerCase(),
+                        code: upperCode,
+                        action: type
+                    }));
+                } catch {
+                    // Fallback über HTTP POST unten
+                }
+            }
+
             try {
                 await fetch(actionUrl, {
                     method: "POST",
@@ -534,7 +548,6 @@
                     },
                     body: payload
                 });
-                await pollMessages();
             } catch {
                 if (navigator.sendBeacon) {
                     const blob = new Blob([payload], { type: "text/plain;charset=UTF-8" });
@@ -561,7 +574,10 @@
         document.getElementById("filterCodeOrt").addEventListener("change", () => renderCodesTab());
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
-                pollMessages();
+                loadInitialMessages();
+                if (!socket || socket.readyState !== WebSocket.OPEN) {
+                    connectWebSocket();
+                }
             }
         });
 
@@ -841,7 +857,35 @@
             renderCodesTab();
         }
 
-        async function pollMessages() {
+        function applyServerState(serverState) {
+            if (!serverState || typeof serverState !== "object") return;
+
+            const nextHidden = new Set(hiddenCodesSet);
+            if (Array.isArray(serverState.hiddenCodes)) {
+                serverState.hiddenCodes.forEach(c => {
+                    if (c) nextHidden.add(String(c).toUpperCase());
+                });
+            }
+
+            const nextCopied = new Set(copiedCodesSet);
+            if (Array.isArray(serverState.copiedCodes)) {
+                serverState.copiedCodes.forEach(c => {
+                    if (c) nextCopied.add(String(c).toUpperCase());
+                });
+            }
+
+            const hiddenChanged = nextHidden.size !== hiddenCodesSet.size;
+            const copiedChanged = nextCopied.size !== copiedCodesSet.size;
+
+            if (hiddenChanged) hiddenCodesSet = nextHidden;
+            if (copiedChanged) copiedCodesSet = nextCopied;
+
+            if (hiddenChanged || copiedChanged) {
+                renderCodesTab();
+            }
+        }
+
+        async function loadInitialMessages() {
             try {
                 const res = await fetch(`${messagesUrl}?t=${Date.now()}`, {
                     cache: "no-store"
@@ -850,7 +894,6 @@
 
                 const data = await res.json();
                 const results = data && data.results ? data.results : {};
-                const serverState = data && data.state ? data.state : {};
                 const byEmail = new Map();
 
                 entries.forEach(entry => {
@@ -878,46 +921,57 @@
                     }
                 });
 
-                const nextHidden = new Set(hiddenCodesSet);
-                if (Array.isArray(serverState.hiddenCodes)) {
-                    serverState.hiddenCodes.forEach(c => {
-                        if (c) nextHidden.add(String(c).toUpperCase());
-                    });
+                if (data && data.state) {
+                    applyServerState(data.state);
                 }
-
-                const nextCopied = new Set(copiedCodesSet);
-                if (Array.isArray(serverState.copiedCodes)) {
-                    serverState.copiedCodes.forEach(c => {
-                        if (c) nextCopied.add(String(c).toUpperCase());
-                    });
-                }
-
-                const hiddenChanged = nextHidden.size !== hiddenCodesSet.size;
-                const copiedChanged = nextCopied.size !== copiedCodesSet.size;
-
-                if (hiddenChanged) hiddenCodesSet = nextHidden;
-                if (copiedChanged) copiedCodesSet = nextCopied;
 
                 const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
-                const entriesChanged = JSON.stringify(merged) !== JSON.stringify(entries);
-
-                if (entriesChanged) {
+                if (JSON.stringify(merged) !== JSON.stringify(entries)) {
                     entries = merged;
                     renderEmailEntries();
-                } else if (hiddenChanged || copiedChanged) {
-                    renderCodesTab();
                 }
             } catch {
-                // Beim nächsten Intervall erneut versuchen
+                // Beim nächsten Reconnect erneut versuchen
             }
         }
 
-        function startPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
+        function connectWebSocket() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
             }
-            pollMessages();
-            pollTimer = setInterval(pollMessages, 3000);
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            const wsUrl = workerBaseUrl.replace(/^http/, "ws") + "/ws";
+            socket = new WebSocket(wsUrl);
+
+            socket.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.state) {
+                        applyServerState(msg.state);
+                    }
+                    if (msg.type === "UPDATE" && msg.action === "new_mail") {
+                        loadInitialMessages();
+                    }
+                } catch {
+                    // Ungültige Nachricht ignorieren
+                }
+            };
+
+            socket.onclose = () => {
+                reconnectTimer = setTimeout(connectWebSocket, 2000);
+            };
+
+            socket.onerror = () => {
+                try {
+                    socket.close();
+                } catch {
+                    // Ignorieren
+                }
+            };
         }
 
         const etAnswer1 = document.getElementById("etAnswer1");
@@ -928,7 +982,8 @@
 
         updateCounterDisplay();
         renderEmailEntries();
-        startPolling();
+        loadInitialMessages();
+        connectWebSocket();
 
         btnSend.addEventListener("click", async () => {
             const a1 = etAnswer1.value.trim();
@@ -1010,7 +1065,8 @@
 
             tvStatus.textContent = logs.join("\n");
             btnSend.disabled = false;
-            startPolling();
+            loadInitialMessages();
+            connectWebSocket();
         });
     </script>
 </body>
