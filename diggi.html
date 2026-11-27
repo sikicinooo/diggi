@@ -503,8 +503,16 @@
         let entries = [];
         let hiddenCodesSet = new Set();
         let copiedCodesSet = new Set();
-        let socket = null;
-        let reconnectTimer = null;
+let pollTimer = null;
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(() => {
+                if (document.visibilityState === "visible") {
+                    loadInitialMessages();
+                }
+            }, 3000);
+        }
 
         async function recordActionRealtime(email, code, type) {
             const upperCode = (code || "").trim().toUpperCase();
