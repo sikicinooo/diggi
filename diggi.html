@@ -510,14 +510,9 @@
 
         function setLocalAction(email, code, type) {
             const key = getActionKey(email, code);
-            const current = actionsMap.get(key) || { added: false, copied: false, hidden: false };
-            if (type === "added") {
-                current.added = true;
-                current.hidden = true;
-            }
-            if (type === "copied") {
-                current.copied = true;
-            }
+            const current = actionsMap.get(key) || { added: false, copied: false };
+            if (type === "added") current.added = true;
+            if (type === "copied") current.copied = true;
             actionsMap.set(key, current);
             renderCodesTab();
         }
@@ -699,10 +694,8 @@
                 codes.forEach(code => {
                     const act = actionsMap.get(getActionKey(entry.email, code)) || {
                         added: false,
-                        copied: false,
-                        hidden: false
+                        copied: false
                     };
-                    if (act.hidden || act.added) return;
                     allRows.push({
                         index: entry.index,
                         email: entry.email,
@@ -734,7 +727,7 @@
                         <div class="result-content">${
                             allRows.length
                                 ? "Keine Codes für den ausgewählten Ort gefunden."
-                                : "Keine offenen 10-stelligen Codes mehr vorhanden."
+                                : "Noch keine 10-stelligen Codes extrahiert."
                         }</div>
                     </div>
                 `;
@@ -772,6 +765,9 @@
                 addLink.target = "_blank";
                 addLink.rel = "noopener noreferrer";
                 addLink.appendChild(document.createTextNode("Hinzufügen"));
+                if (row.added) {
+                    addLink.appendChild(createGreenCheck());
+                }
                 addLink.addEventListener("click", () => {
                     recordActionRealtime(row.email, row.code, "added");
                 });
@@ -851,166 +847,4 @@
                 const serverActions = data && data.actions ? data.actions : {};
                 const byEmail = new Map();
 
-                entries.forEach(entry => {
-                    byEmail.set(entry.email.toLowerCase(), entry);
-                });
-
-                Object.entries(results).forEach(([emailKey, hit]) => {
-                    const lowerEmail = emailKey.toLowerCase();
-                    const content = hit && hit.content ? hit.content : "";
-                    if (!content) return;
-
-                    const existing = byEmail.get(lowerEmail);
-                    if (existing) {
-                        byEmail.set(lowerEmail, {
-                            ...existing,
-                            content
-                        });
-                    } else {
-                        byEmail.set(lowerEmail, {
-                            index: extractIndexFromEmail(lowerEmail),
-                            email: lowerEmail,
-                            ort: detectOrtFromEmailOrEntry(lowerEmail, "Unbekannt"),
-                            content
-                        });
-                    }
-                });
-
-                const nextActionsMap = new Map(actionsMap);
-                Object.entries(serverActions).forEach(([mapKey, act]) => {
-                    const normalizedKey = mapKey.toLowerCase();
-                    const prev = nextActionsMap.get(normalizedKey) || { added: false, copied: false, hidden: false };
-                    const isAdded = Boolean(prev.added || (act && act.added));
-                    const isCopied = Boolean(prev.copied || (act && act.copied));
-                    const isHidden = Boolean(prev.hidden || (act && act.hidden) || isAdded);
-                    nextActionsMap.set(normalizedKey, {
-                        added: isAdded,
-                        copied: isCopied,
-                        hidden: isHidden
-                    });
-                });
-
-                const merged = Array.from(byEmail.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
-                const entriesChanged = JSON.stringify(merged) !== JSON.stringify(entries);
-                const actionsChanged =
-                    JSON.stringify(Array.from(nextActionsMap.entries()).sort()) !==
-                    JSON.stringify(Array.from(actionsMap.entries()).sort());
-
-                if (actionsChanged) {
-                    actionsMap = nextActionsMap;
-                }
-
-                if (entriesChanged) {
-                    entries = merged;
-                    renderEmailEntries();
-                } else if (actionsChanged) {
-                    renderCodesTab();
-                }
-            } catch {
-                // Beim nächsten Intervall erneut versuchen
-            }
-        }
-
-        function startPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-            }
-            pollMessages();
-            pollTimer = setInterval(pollMessages, 2500);
-        }
-
-        const etAnswer1 = document.getElementById("etAnswer1");
-        const etAnswer2 = document.getElementById("etAnswer2");
-        const etRepeatCount = document.getElementById("etRepeatCount");
-        const btnSend = document.getElementById("btnSend");
-        const tvStatus = document.getElementById("tvStatus");
-
-        updateCounterDisplay();
-        renderEmailEntries();
-        startPolling();
-
-        btnSend.addEventListener("click", async () => {
-            const a1 = etAnswer1.value.trim();
-            const baseEmail = etAnswer2.value.trim() || DEFAULT_BASE_EMAIL;
-            const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
-            const repeatCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? parsedCount : 1;
-
-            etAnswer2.value = "";
-            btnSend.disabled = true;
-
-            let currentCounter = getSavedCounter();
-            tvStatus.textContent = `Starte ${repeatCount} Durchlauf/Durchläufe (ab #${currentCounter + 1})...`;
-
-            const logs = [];
-
-            for (let i = 1; i <= repeatCount; i++) {
-                currentCounter += 1;
-                setSavedCounter(currentCounter);
-
-                const numberedEmail = buildLocationPlusEmail(baseEmail, a1, currentCounter);
-                tvStatus.textContent = [...logs, `[${i}/${repeatCount}] Sende an ${numberedEmail}...`].join("\n");
-
-                const answersArray = [
-                    {
-                        questionId: "r9f72a3a2d06f43d999369da8cedd2bb4",
-                        answer1: a1
-                    },
-                    {
-                        questionId: "reb0fe8e35f5d4c0f987fb7277da2c530",
-                        answer1: numberedEmail
-                    }
-                ];
-
-                const bodyJson = JSON.stringify({
-                    startDate: defaultStartDate,
-                    submitDate: defaultSubmitDate,
-                    answers: JSON.stringify(answersArray)
-                });
-
-                try {
-                    const response = await fetch(endpointUrl, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Accept": "application/json"
-                        },
-                        body: bodyJson
-                    });
-
-                    if (response.ok) {
-                        logs.push(`[${i}/${repeatCount}] Erfolgreich (${numberedEmail})`);
-                        entries.push({
-                            index: currentCounter,
-                            email: numberedEmail,
-                            ort: a1,
-                            content: "Warte auf E-Mail-Inhalt..."
-                        });
-                    } else {
-                        logs.push(`[${i}/${repeatCount}] Fehler (HTTP ${response.status}) – ${numberedEmail}`);
-                        entries.push({
-                            index: currentCounter,
-                            email: numberedEmail,
-                            ort: a1,
-                            content: `Request fehlgeschlagen (HTTP ${response.status})`
-                        });
-                    }
-                } catch {
-                    logs.push(`[${i}/${repeatCount}] Fehler – ${numberedEmail}`);
-                    entries.push({
-                        index: currentCounter,
-                        email: numberedEmail,
-                        ort: a1,
-                        content: "Netzwerk-/Request-Fehler"
-                    });
-                }
-
-                renderEmailEntries();
-            }
-
-            tvStatus.textContent = logs.join("\n");
-            btnSend.disabled = false;
-            startPolling();
-        });
-    </script>
-</body>
-</html>
+                entries.for
