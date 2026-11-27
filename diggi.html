@@ -522,6 +522,7 @@
             try {
                 await fetch(actionUrl, {
                     method: "POST",
+                    cache: "no-store",
                     headers: {
                         "Content-Type": "application/json",
                         "Accept": "application/json"
@@ -836,7 +837,9 @@
 
         async function pollMessages() {
             try {
-                const res = await fetch(messagesUrl);
+                const res = await fetch(`${messagesUrl}?t=${Date.now()}`, {
+                    cache: "no-store"
+                });
                 if (!res.ok) return;
 
                 const data = await res.json();
