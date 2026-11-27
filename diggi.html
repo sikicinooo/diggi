@@ -18,6 +18,87 @@
             display: flex;
             justify-content: center;
         }
+        body.locked {
+            overflow: hidden;
+            padding: 16px;
+        }
+        body.locked .app-shell,
+        body.locked .bottom-nav {
+            display: none !important;
+        }
+        .lock-screen {
+            display: none;
+            width: 100%;
+            max-width: 380px;
+            min-height: calc(100vh - 32px);
+            align-items: center;
+            justify-content: center;
+        }
+        body.locked .lock-screen {
+            display: flex;
+        }
+        .lock-card {
+            width: 100%;
+            background-color: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 24px 20px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+            text-align: center;
+        }
+        .lock-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0F172A;
+            margin-bottom: 6px;
+        }
+        .lock-subtitle {
+            font-size: 13px;
+            color: #64748B;
+            margin-bottom: 16px;
+        }
+        .pin-input {
+            width: 100%;
+            height: 54px;
+            padding: 0 14px;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 0.35em;
+            text-align: center;
+            color: #0F172A;
+            background-color: #F8FAFC;
+            border: 1px solid #CBD5E1;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .pin-input:focus {
+            border-color: #F97316;
+            background-color: #FFFFFF;
+        }
+        .lock-error {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #DC2626;
+        }
+        .lock-btn {
+            width: 100%;
+            height: 50px;
+            margin-top: 8px;
+            background-color: #F97316;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .lock-btn:hover {
+            background-color: #EA580C;
+        }
         .container {
             width: 100%;
             max-width: 540px;
@@ -302,8 +383,29 @@
         }
     </style>
 </head>
-<body>
-    <div class="container">
+<body class="locked">
+    <!-- Zugangssperre -->
+    <div id="lockScreen" class="lock-screen">
+        <form id="pinForm" class="lock-card" autocomplete="off">
+            <div class="lock-title">Zugang geschützt</div>
+            <div class="lock-subtitle">Bitte Zahlencode eingeben</div>
+            <input
+                type="text"
+                id="pinInput"
+                class="pin-input"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="8"
+                placeholder="••••"
+                autofocus
+            >
+            <button type="submit" class="lock-btn">Entsperren</button>
+            <div id="lockError" class="lock-error" aria-live="polite"></div>
+        </form>
+    </div>
+
+    <!-- Hauptanwendung -->
+    <div class="container app-shell">
         <div id="senderSection" class="sender-section">
             <!-- 1. Titel: Ort -->
             <div class="card">
@@ -377,6 +479,52 @@
     </nav>
 
     <script>
+        const ACCESS_PIN = "8181";
+        let isUnlocked = false;
+
+        const pinForm = document.getElementById("pinForm");
+        const pinInput = document.getElementById("pinInput");
+        const lockError = document.getElementById("lockError");
+
+        function sanitizeDigitsOnly(value) {
+            return (value || "").replace(/\D+/g, "");
+        }
+
+        function unlockApp() {
+            isUnlocked = true;
+            document.body.classList.remove("locked");
+            lockError.textContent = "";
+            pinInput.value = "";
+            loadInitialMessages();
+            startPolling();
+        }
+
+        pinInput.addEventListener("input", () => {
+            const digitsOnly = sanitizeDigitsOnly(pinInput.value);
+            if (pinInput.value !== digitsOnly) {
+                pinInput.value = digitsOnly;
+            }
+            lockError.textContent = "";
+
+            if (digitsOnly === ACCESS_PIN) {
+                unlockApp();
+            }
+        });
+
+        pinForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const entered = sanitizeDigitsOnly(pinInput.value);
+            pinInput.value = entered;
+
+            if (entered === ACCESS_PIN) {
+                unlockApp();
+            } else {
+                lockError.textContent = "Falscher Zahlencode.";
+                pinInput.focus();
+                pinInput.select();
+            }
+        });
+
         const workerBaseUrl = "https://diggi-proxy.sikicinooo.workers.dev";
         const endpointUrl = `${workerBaseUrl}/`;
         const messagesUrl = `${workerBaseUrl}/messages`;
@@ -506,15 +654,17 @@
         let pollTimer = null;
 
         function startPolling() {
+            if (!isUnlocked) return;
             if (pollTimer) clearInterval(pollTimer);
             pollTimer = setInterval(() => {
-                if (document.visibilityState === "visible") {
+                if (isUnlocked && document.visibilityState === "visible") {
                     loadInitialMessages();
                 }
             }, 3000);
         }
 
         async function recordActionRealtime(email, code, type) {
+            if (!isUnlocked) return;
             const upperCode = (code || "").trim().toUpperCase();
             if (!upperCode) return;
 
@@ -568,7 +718,7 @@
         document.getElementById("tabBtnCodes").addEventListener("click", () => switchBottomTab("codes"));
         document.getElementById("filterCodeOrt").addEventListener("change", () => renderCodesTab());
         document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") {
+            if (isUnlocked && document.visibilityState === "visible") {
                 loadInitialMessages();
                 startPolling();
             }
@@ -890,6 +1040,7 @@
         }
 
         async function loadInitialMessages() {
+            if (!isUnlocked) return;
             try {
                 const res = await fetch(`${messagesUrl}?t=${Date.now()}`, {
                     cache: "no-store"
@@ -940,10 +1091,9 @@
 
         updateCounterDisplay();
         renderEmailEntries();
-        loadInitialMessages();
-        startPolling();
 
         btnSend.addEventListener("click", async () => {
+            if (!isUnlocked) return;
             const a1 = etAnswer1.value.trim();
             const rawInputEmail = etAnswer2.value.trim();
             const parsedCount = parseInt(etRepeatCount.value.trim(), 10);
